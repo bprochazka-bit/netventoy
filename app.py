@@ -16,7 +16,7 @@ No pip required.
 """
 
 import os, json, subprocess, threading, hashlib, shutil, signal, time
-import sys, time, re, socket, logging, tempfile
+import sys, time, re, socket, logging, tempfile, argparse
 from pathlib import Path
 from http import HTTPStatus
 
@@ -421,7 +421,7 @@ def regenerate_grub_cfg() -> None:
     is EFI and Secure Boot is active and the boot method may not be SB-signed.
     """
     ip       = get_server_ip()
-    base_url = f'http://{ip}:5000'
+    base_url = f'http://{ip}:{WEB_PORT}'
     t        = load_theme()
     timeout  = int(t['timeout'])
     title    = t['title']
@@ -681,7 +681,7 @@ def write_dnsmasq_conf(iface: str = '') -> str:
         '',
         '# HTTP Boot (UEFI 2.5+)',
         f'dhcp-match=set:httpboot,option:vendor-class,HTTPClient',
-        f'dhcp-boot=tag:httpboot,tag:efi-x86_64,http://{ip}:5000/tftp/shimx64.efi',
+        f'dhcp-boot=tag:httpboot,tag:efi-x86_64,http://{ip}:{WEB_PORT}/tftp/shimx64.efi',
         '',
         'enable-tftp',
         f'tftp-root={TFTP_DIR}',
@@ -1065,7 +1065,15 @@ def shutdown(sig, frame):
 signal.signal(signal.SIGINT,  shutdown)
 signal.signal(signal.SIGTERM, shutdown)
 
+WEB_PORT = 5000  # default; overridden by --port
+
 if __name__ == '__main__':
+    parser = argparse.ArgumentParser(description='NetVentoy — PXE boot server')
+    parser.add_argument('--port', '-p', type=int, default=5000,
+                        help='Web UI / HTTP port (default: 5000)')
+    args = parser.parse_args()
+    WEB_PORT = args.port
+
     print(r"""
   _   _      _   _   _            _
  | \ | | ___| |_| \ | | ___  _ _| |_ ___  _   _
@@ -1076,4 +1084,4 @@ if __name__ == '__main__':
   Ventoy for the Network Age  —  Debian 13 Edition
 """)
     startup()
-    app.run(host='0.0.0.0', port=5000, debug=False, threaded=True)
+    app.run(host='0.0.0.0', port=WEB_PORT, debug=False, threaded=True)

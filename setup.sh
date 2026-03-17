@@ -204,14 +204,19 @@ EMBED_CFG="$GRUB_DIR/i386-pc/embed.cfg"
 cat > "$EMBED_CFG" << 'GRUBEOF'
 echo "NetVentoy: loading configuration..."
 
+# In ProxyDHCP mode the PXE cached DHCP packet often has the wrong
+# siaddr, so (pxe) points to the router instead of our TFTP server.
+# Do net_bootp FIRST to get the correct server address, then load config.
+net_bootp
+if [ -n "$net_default_server" ]; then
+  set prefix=(tftp,$net_default_server)/grub
+  echo "TFTP prefix: $prefix  server=$net_default_server"
+  normal
+fi
+
+# Fallback: try the raw PXE device (works when siaddr is correct)
 set prefix=(pxe)/grub
 echo "Trying PXE prefix: $prefix"
-normal
-
-echo "PXE config load failed, trying net_bootp..."
-net_bootp
-set prefix=(tftp,$net_default_server)/grub
-echo "TFTP prefix: $prefix  server=$net_default_server"
 normal
 
 echo "ERROR: Could not load grub.cfg from any source."
@@ -291,11 +296,19 @@ fi
 
 # ── Print binary inventory ────────────────────────────────────────────────────
 echo ""
-info "TFTP directory inventory:"
-find "$TFTP_DIR" -type f | sort | while read f; do
-    size=$(du -sh "$f" 2>/dev/null | cut -f1)
-    echo "    $size  ${f#$TFTP_DIR/}"
+info "TFTP boot chain files:"
+for f in \
+    "$TFTP_DIR/shimx64.efi" \
+    "$TFTP_DIR/grubx64.efi" \
+    "$GRUB_DIR/i386-pc/core.0" \
+    "$GRUB_DIR/grub.cfg"; do
+    if [ -f "$f" ]; then
+        size=$(du -sh "$f" 2>/dev/null | cut -f1)
+        echo "    $size  ${f#$TFTP_DIR/}"
+    fi
 done
+TOTAL_FILES=$(find "$TFTP_DIR" -type f | wc -l)
+echo "    ($TOTAL_FILES files total in tftp/)"
 
 # ── Summary ───────────────────────────────────────────────────────────────────
 IP=$(python3 -c "

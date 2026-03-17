@@ -204,23 +204,18 @@ EMBED_CFG="$GRUB_DIR/i386-pc/embed.cfg"
 cat > "$EMBED_CFG" << 'GRUBEOF'
 echo "NetVentoy: loading configuration..."
 
-# In ProxyDHCP mode the PXE cached DHCP packet often has the wrong
-# siaddr, so (pxe) points to the router instead of our TFTP server.
-# Do net_bootp FIRST to get the correct server address, then load config.
-net_bootp
-if [ -n "$net_default_server" ]; then
-  set prefix=(tftp,$net_default_server)/grub
-  echo "TFTP prefix: $prefix  server=$net_default_server"
-  normal
-fi
-
-# Fallback: try the raw PXE device (works when siaddr is correct)
 set prefix=(pxe)/grub
 echo "Trying PXE prefix: $prefix"
 normal
 
+echo "PXE prefix failed, trying DHCP..."
+net_bootp
+set prefix=(tftp,$net_default_server)/grub
+echo "TFTP prefix: $prefix  server=$net_default_server"
+normal
+
 echo "ERROR: Could not load grub.cfg from any source."
-echo "Dropping to GRUB rescue shell — type 'ls' to explore devices."
+echo "Dropping to GRUB rescue shell."
 GRUBEOF
 
 if [ -d "$GRUB_BIOS_MODS" ]; then

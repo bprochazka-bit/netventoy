@@ -157,16 +157,16 @@ fi
 # ── Stage BIOS boot chain ─────────────────────────────────────────────────────
 info "Generating BIOS PXE boot image (grub-mknetdir)..."
 
-# grub-mknetdir generates a self-contained BIOS PXE directory under
-# $GRUB_DIR/i386-pc/  containing core.0 (the chainloaded PXE image)
-# and all required grub modules.
-# core.0 is the file dnsmasq hands to BIOS PXE clients via DHCP option.
+# grub-mknetdir creates <net-directory>/<subdir>/<platform>/core.0
+# We need grub/i386-pc/core.0 relative to tftp-root, so:
+#   net-directory = $TFTP_DIR   →  /opt/netventoy/tftp
+#   subdir        = grub        →  /opt/netventoy/tftp/grub/i386-pc/core.0
 grub-mknetdir \
-    --net-directory="$GRUB_DIR" \
-    --subdir="i386-pc" \
+    --net-directory="$TFTP_DIR" \
+    --subdir="grub" \
     2>&1 | tail -5
 
-if [ -f "$GRUB_DIR/i386-pc/core.0" ]; then
+if [ -f "$TFTP_DIR/grub/i386-pc/core.0" ]; then
     ok "BIOS grub core.0 generated at grub/i386-pc/core.0"
 else
     warn "grub-mknetdir may have failed — check output above"

@@ -196,10 +196,7 @@ BIOS_MODULES=(
     minicmd biosdisk
 )
 
-# Detect server IP — needed for embed.cfg (ProxyDHCP workaround).
-# In ProxyDHCP mode, GRUB's (pxe) device and net_bootp both resolve to the
-# main DHCP server instead of our TFTP server.  Hardcode our IP in the
-# embedded config so GRUB connects to the right host.
+# Detect server IP — used for info messages at end of setup.
 SERVER_IP=$(python3 -c "
 import socket
 s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -216,10 +213,8 @@ info "Server IP: $SERVER_IP"
 # Embedded bootstrap config — runs in rescue mode (no comments, no if/then).
 EMBED_CFG="$GRUB_DIR/i386-pc/embed.cfg"
 cat > "$EMBED_CFG" << GRUBEOF
-echo "NetVentoy: acquiring network via DHCP..."
-net_bootp
-echo "NetVentoy: loading configuration from ${SERVER_IP}..."
-set prefix=(tftp,${SERVER_IP})/grub
+echo "NetVentoy: loading configuration..."
+set prefix=(pxe)/grub
 normal
 
 echo "ERROR: Could not load grub.cfg — dropping to rescue shell."
@@ -230,7 +225,7 @@ if [ -d "$GRUB_BIOS_MODS" ]; then
         -O i386-pc-pxe \
         -o "$BIOS_CORE" \
         -c "$EMBED_CFG" \
-        -p "(tftp,${SERVER_IP})/grub" \
+        -p "(pxe)/grub" \
         -d "$GRUB_BIOS_MODS" \
         "${BIOS_MODULES[@]}" \
         2>&1

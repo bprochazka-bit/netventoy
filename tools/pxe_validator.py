@@ -223,11 +223,12 @@ def build_request(xid, mac, offered_ip, server_ip):
     opts += bytes([OPT_END])
     return pkt + opts
 
-def build_proxy_request(xid, mac, proxy_ip, vendor_class="PXEClient:Arch:00000:UNDI:002001"):
+def build_proxy_request(xid, mac, proxy_ip, client_ip='0.0.0.0',
+                        vendor_class="PXEClient:Arch:00000:UNDI:002001"):
     """DHCPREQUEST sent unicast to proxy DHCP server on port 4011."""
     pkt = struct.pack('!BBBBIHH4s4s4s4s16s64s128sI',
         1,1,6,0,xid,0,0,  # flags=0 unicast
-        b'\x00'*4, b'\x00'*4,
+        str_to_ip(client_ip), b'\x00'*4,
         bytes(int(x) for x in proxy_ip.split('.')),
         b'\x00'*4,
         mac+b'\x00'*10,
@@ -235,6 +236,10 @@ def build_proxy_request(xid, mac, proxy_ip, vendor_class="PXEClient:Arch:00000:U
     opts  = bytes([OPT_MSG_TYPE,1,DHCP_REQUEST])
     vc    = vendor_class.encode()
     opts += bytes([OPT_VENDOR_CLASS,len(vc)])+vc
+    # Option 93 — Client System Architecture (required for pxe-service matching)
+    arch_m = re.search(r'Arch:(\d+)', vendor_class)
+    arch_code = int(arch_m.group(1)) if arch_m else 0
+    opts += bytes([OPT_CLIENT_ARCH, 2]) + struct.pack('!H', arch_code)
     opts += bytes([OPT_END])
     return pkt+opts
 
@@ -549,7 +554,7 @@ def do_dhcp_handshake(interface, timeout, vendor_class, debug, relax_xid=False):
                 proxy_sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
                 proxy_sock.settimeout(timeout)
                 proxy_sock.bind(('', 68))
-                proxy_req = build_proxy_request(xid, mac, proxy_ip, vendor_class)
+                proxy_req = build_proxy_request(xid, mac, proxy_ip, ack['yiaddr'], vendor_class)
                 proxy_sock.sendto(proxy_req, (proxy_ip, PROXY_DHCP_PORT))
                 log("SEND", f"Proxy DHCPREQUEST sent ({len(proxy_req)} bytes)")
 

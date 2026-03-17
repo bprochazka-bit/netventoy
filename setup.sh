@@ -196,26 +196,32 @@ BIOS_MODULES=(
     minicmd biosdisk
 )
 
-# Embedded bootstrap config — runs in rescue mode before normal.
-# In ProxyDHCP mode the PXE cached DHCP packet often lacks the correct
-# siaddr (TFTP server), so GRUB's (pxe) device points to the wrong host.
-# Fix: use GRUB's own net stack to re-do DHCP and get the right server.
+# Detect server IP — needed for embed.cfg (ProxyDHCP workaround).
+# In ProxyDHCP mode, GRUB's (pxe) device and net_bootp both resolve to the
+# main DHCP server instead of our TFTP server.  Hardcode our IP in the
+# embedded config so GRUB connects to the right host.
+SERVER_IP=$(python3 -c "
+import socket
+s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+s.connect(('8.8.8.8', 80))
+print(s.getsockname()[0])
+s.close()
+" 2>/dev/null || echo "")
+
+if [ -z "$SERVER_IP" ]; then
+    err "Could not detect server IP — needed for GRUB embed config"
+fi
+info "Server IP: $SERVER_IP"
+
+# Embedded bootstrap config — runs in rescue mode (no comments, no if/then).
 EMBED_CFG="$GRUB_DIR/i386-pc/embed.cfg"
-cat > "$EMBED_CFG" << 'GRUBEOF'
+cat > "$EMBED_CFG" << GRUBEOF
 echo "NetVentoy: loading configuration..."
-
-set prefix=(pxe)/grub
-echo "Trying PXE prefix: $prefix"
+set prefix=(tftp,${SERVER_IP})/grub
+echo "TFTP prefix: \$prefix"
 normal
 
-echo "PXE prefix failed, trying DHCP..."
-net_bootp
-set prefix=(tftp,$net_default_server)/grub
-echo "TFTP prefix: $prefix  server=$net_default_server"
-normal
-
-echo "ERROR: Could not load grub.cfg from any source."
-echo "Dropping to GRUB rescue shell."
+echo "ERROR: Could not load grub.cfg — dropping to rescue shell."
 GRUBEOF
 
 if [ -d "$GRUB_BIOS_MODS" ]; then
@@ -223,7 +229,7 @@ if [ -d "$GRUB_BIOS_MODS" ]; then
         -O i386-pc-pxe \
         -o "$BIOS_CORE" \
         -c "$EMBED_CFG" \
-        -p '(pxe)/grub' \
+        -p "(tftp,${SERVER_IP})/grub" \
         -d "$GRUB_BIOS_MODS" \
         "${BIOS_MODULES[@]}" \
         2>&1
@@ -306,14 +312,6 @@ TOTAL_FILES=$(find "$TFTP_DIR" -type f | wc -l)
 echo "    ($TOTAL_FILES files total in tftp/)"
 
 # ── Summary ───────────────────────────────────────────────────────────────────
-IP=$(python3 -c "
-import socket
-s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-s.connect(('8.8.8.8', 80))
-print(s.getsockname()[0])
-s.close()
-" 2>/dev/null || echo "YOUR-IP")
-
 echo ""
 echo "═══════════════════════════════════════════════════"
 ok "Setup complete!"
@@ -322,7 +320,7 @@ echo "  Start:"
 echo "    sudo python3 $SCRIPT_DIR/app.py"
 echo ""
 echo "  Web UI:"
-echo "    http://${IP}:5000"
+echo "    http://${SERVER_IP}:5000"
 echo ""
 echo "  USG / Router:"
 echo "    Remove all PXE / next-server options."
@@ -330,6 +328,6 @@ echo "    dnsmasq ProxyDHCP handles PXE for all clients."
 echo ""
 echo "  Boot chain:"
 echo "    EFI (Secure Boot) → shimx64.efi → grubx64.efi → grub.cfg"
-echo "    EFI (HTTP Boot)   → http://${IP}:5000/tftp/shimx64.efi"
+echo "    EFI (HTTP Boot)   → http://${SERVER_IP}:5000/tftp/shimx64.efi"
 echo "    BIOS              → grub/i386-pc/core.0 → grub.cfg"
 echo "═══════════════════════════════════════════════════"

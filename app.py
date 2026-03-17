@@ -527,7 +527,11 @@ def regenerate_grub_cfg() -> None:
         'fi',
     ]
 
-    GRUB_CFG.write_text('\n'.join(L))
+    cfg_text = '\n'.join(L)
+    GRUB_CFG.write_text(cfg_text)
+    # Also write to TFTP root — EFI grub (grubx64.efi) looks for grub.cfg
+    # in the same directory it was loaded from, which is the TFTP root.
+    (TFTP_DIR / 'grub.cfg').write_text(cfg_text)
     log.info('grub.cfg written (%d entries)', len(enabled))
 
 
@@ -910,10 +914,16 @@ def api_upload():
 @app.route('/api/directories')
 def api_directories():
     dirs = set()
+    # Include directories that contain ISOs (from database)
     with _lock:
         for k in iso_db:
             parts = Path(k).parts
             for i in range(len(parts)-1): dirs.add('/'.join(parts[:i+1]))
+    # Also include all actual directories under ISO_DIR (even if empty)
+    for p in ISO_DIR.rglob('*'):
+        if p.is_dir():
+            rel = p.relative_to(ISO_DIR)
+            dirs.add(str(rel))
     return jsonify(sorted(dirs))
 
 @app.route('/api/mkdir', methods=['POST'])

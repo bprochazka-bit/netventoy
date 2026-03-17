@@ -176,14 +176,24 @@ fi
 # Remove the unsigned EFI output to avoid confusion.
 rm -f "$GRUB_DIR/x86_64-efi/core.efi" 2>/dev/null || true
 
-# grub needs its module files at (pxe)/grub/x86_64-efi/ for EFI grub.
-# grubnetx64.efi.signed has most modules built-in for netboot but
+# ── Ensure grub modules are available for network loading ─────────────────
+# BIOS grub core.0 has a minimal set of embedded modules. It loads additional
+# modules (normal.mod, etc.) from the network using the prefix (pxe)/grub.
+# grub-mknetdir may not copy all .mod files, so ensure they're present.
+GRUB_BIOS_MODS="/usr/lib/grub/i386-pc"
+if [ -d "$GRUB_BIOS_MODS" ]; then
+    mkdir -p "$GRUB_DIR/i386-pc"
+    cp -n "$GRUB_BIOS_MODS/"*.mod "$GRUB_DIR/i386-pc/" 2>/dev/null || true
+    ok "grub BIOS i386-pc modules staged"
+fi
+
+# EFI grub: grubnetx64.efi.signed has most modules built-in for netboot but
 # copy them anyway so grub can load optional modules (font, etc).
 GRUB_EFI_MODS="/usr/lib/grub/x86_64-efi"
 if [ -d "$GRUB_EFI_MODS" ]; then
     mkdir -p "$GRUB_DIR/x86_64-efi"
-    cp -r "$GRUB_EFI_MODS/"*.mod "$GRUB_DIR/x86_64-efi/" 2>/dev/null || true
-    ok "grub EFI modules staged"
+    cp -n "$GRUB_EFI_MODS/"*.mod "$GRUB_DIR/x86_64-efi/" 2>/dev/null || true
+    ok "grub EFI x86_64-efi modules staged"
 fi
 
 # ── Proxmox / bridge netfilter check ─────────────────────────────────────────

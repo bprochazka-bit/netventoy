@@ -1,0 +1,24 @@
+[Unit]
+Description=NetVentoy Network Boot Server
+Documentation=https://github.com/yourrepo/netventoy
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/opt/netventoy
+ExecStart=/usr/bin/python3 /opt/netventoy/app.py
+Restart=on-failure
+RestartSec=5
+Environment=NETVENTOY_DIR=/opt/netventoy
+
+# Allow binding to DHCP/TFTP ports
+AmbientCapabilities=CAP_NET_BIND_SERVICE
+
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=netventoy
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,26 @@
+# NetVentoy — Debian 13 (Trixie) APT packages ONLY. No pip.
+#
+# Install with:
+#   sudo apt install \
+#       python3-flask python3-werkzeug python3-watchdog \
+#       dnsmasq xorriso \
+#       shim-signed grub-efi-amd64-signed grub-efi-amd64-bin grub-pc-bin \
+#       wget
+#
+# Package                  Purpose
+# -----------------------  ------------------------------------------------
+# python3-flask            Web UI & REST API
+# python3-werkzeug         WSGI utilities, secure file upload
+# python3-watchdog         inotify filesystem watching
+# dnsmasq                  ProxyDHCP + TFTP server
+# xorriso                  ISO kernel/WinPE extraction
+# shim-signed              shimx64.efi — Microsoft-trusted EFI shim
+# grub-efi-amd64-signed    grubnetx64.efi — distro-signed netboot grub (EFI)
+# grub-efi-amd64-bin       grub EFI modules
+# grub-pc-bin              grub-mknetdir — generates BIOS PXE core image
+# wget                     download wimboot binary during WinPE extraction
+#
+# Boot chain:
+#   EFI Secure Boot:  shimx64.efi (MS-trusted) → grubx64.efi (distro-signed) → grub.cfg
+#   EFI HTTP Boot:    same binaries over HTTP
+#   BIOS:             grub/i386-pc/core.0 (unsigned, SB n/a) → grub.cfg

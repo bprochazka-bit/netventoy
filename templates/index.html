@@ -1,0 +1,1108 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NetVentoy</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Syne:wght@400;600;800&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg:       #0a0e1a; --bg2: #0f1526; --bg3: #151d35;
+  --border:   #1e2d50; --border2: #2a3f6f;
+  --accent:   #3d7eff; --accent2: #00d4ff; --accent3: #7c3aed;
+  --success:  #10b981; --warn: #f59e0b; --danger: #ef4444;
+  --text:     #e2e8f0; --text2: #94a3b8; --text3: #64748b;
+  --mono:     'Space Mono', monospace;
+  --sans:     'Syne', sans-serif;
+}
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+body { background: var(--bg); color: var(--text); font-family: var(--sans); min-height: 100vh; overflow-x: hidden; }
+body::before {
+  content: ''; position: fixed; inset: 0;
+  background-image: linear-gradient(var(--border) 1px, transparent 1px),
+                    linear-gradient(90deg, var(--border) 1px, transparent 1px);
+  background-size: 40px 40px; opacity: 0.25; pointer-events: none; z-index: 0;
+}
+body::after {
+  content: ''; position: fixed; top: -50%; left: -50%; width: 200%; height: 200%;
+  background: radial-gradient(ellipse at 30% 20%, #3d7eff12 0%, transparent 50%),
+              radial-gradient(ellipse at 70% 80%, #7c3aed0e 0%, transparent 50%);
+  pointer-events: none; z-index: 0; animation: bgP 10s ease-in-out infinite alternate;
+}
+@keyframes bgP { from { transform: translate(0,0); } to { transform: translate(2%,2%); } }
+.app { position: relative; z-index: 1; display: flex; flex-direction: column; min-height: 100vh; }
+
+/* Header */
+header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 14px 28px; background: linear-gradient(180deg,var(--bg2) 0%,transparent 100%);
+  border-bottom: 1px solid var(--border); backdrop-filter: blur(10px);
+  position: sticky; top: 0; z-index: 100;
+}
+.logo { display: flex; align-items: center; gap: 12px; }
+.logo-icon { width: 34px; height: 34px; background: linear-gradient(135deg,var(--accent),var(--accent3)); border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 17px; }
+.logo-text { font-size: 21px; font-weight: 800; letter-spacing: -0.5px; background: linear-gradient(90deg,var(--accent2),var(--accent)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+.logo-sub { font-family: var(--mono); font-size: 9px; color: var(--text3); letter-spacing: 2px; text-transform: uppercase; }
+.header-right { display: flex; align-items: center; gap: 12px; }
+.ip-badge { font-family: var(--mono); font-size: 12px; color: var(--accent2); background: #00d4ff0d; border: 1px solid #00d4ff25; padding: 5px 11px; border-radius: 6px; }
+.status-pill { display: flex; align-items: center; gap: 6px; padding: 5px 11px; background: var(--bg3); border: 1px solid var(--border); border-radius: 20px; font-family: var(--mono); font-size: 11px; color: var(--text2); }
+.dot { width: 6px; height: 6px; border-radius: 50%; background: var(--text3); }
+.dot.on  { background: var(--success); box-shadow: 0 0 6px var(--success); animation: blink 2s infinite; }
+.dot.off { background: var(--danger); }
+@keyframes blink { 0%,100%{opacity:1} 50%{opacity:.4} }
+
+/* Layout */
+main { display: grid; grid-template-columns: 250px 1fr; flex: 1; }
+
+/* Sidebar */
+aside { background: var(--bg2); border-right: 1px solid var(--border); padding: 20px 0; position: sticky; top: 63px; height: calc(100vh - 63px); overflow-y: auto; }
+.sb-label { font-family: var(--mono); font-size: 9px; letter-spacing: 2px; color: var(--text3); text-transform: uppercase; padding: 0 20px; margin: 16px 0 6px; }
+.sb-nav { list-style: none; }
+.sb-nav li { margin: 1px 8px; }
+.nav-btn {
+  display: flex; align-items: center; gap: 9px; padding: 8px 12px;
+  border-radius: 8px; color: var(--text2); font-size: 13px; cursor: pointer;
+  transition: all .15s; border: 1px solid transparent; background: none;
+  width: 100%; text-align: left; font-family: var(--sans);
+}
+.nav-btn:hover { background: var(--bg3); color: var(--text); }
+.nav-btn.active { background: #3d7eff12; color: var(--accent); border-color: #3d7eff25; }
+.nav-icon { font-size: 13px; width: 18px; text-align: center; }
+.nav-count { margin-left: auto; background: var(--bg3); border: 1px solid var(--border); border-radius: 10px; padding: 1px 7px; font-family: var(--mono); font-size: 10px; color: var(--text3); }
+.dir-item { display: flex; align-items: center; gap: 7px; padding: 5px 20px; cursor: pointer; color: var(--text3); font-size: 12px; transition: all .15s; }
+.dir-item:hover { color: var(--text); background: var(--bg3); }
+
+/* Content */
+.content { padding: 28px 32px; overflow-y: auto; }
+.panel { display: none; animation: fadeIn .2s ease; }
+.panel.active { display: block; }
+@keyframes fadeIn { from{opacity:0;transform:translateY(6px)} to{opacity:1;transform:translateY(0)} }
+.panel-header { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 22px; }
+.panel-title { font-size: 22px; font-weight: 800; letter-spacing: -.4px; }
+.panel-sub { font-size: 12px; color: var(--text3); margin-top: 2px; font-family: var(--mono); }
+
+/* Buttons */
+.btn { display: inline-flex; align-items: center; gap: 7px; padding: 8px 15px; border-radius: 8px; font-family: var(--sans); font-size: 13px; font-weight: 600; cursor: pointer; transition: all .15s; border: 1px solid transparent; text-decoration: none; }
+.btn-primary   { background: var(--accent); color: #fff; border-color: var(--accent); }
+.btn-primary:hover { background: #5a91ff; box-shadow: 0 0 18px #3d7eff35; }
+.btn-secondary { background: var(--bg3); color: var(--text); border-color: var(--border2); }
+.btn-secondary:hover { border-color: var(--accent); color: var(--accent); }
+.btn-danger    { background: #ef444412; color: var(--danger); border-color: #ef444430; }
+.btn-danger:hover { background: #ef444422; }
+.btn-success   { background: #10b98112; color: var(--success); border-color: #10b98130; }
+.btn-warn      { background: #f59e0b12; color: var(--warn); border-color: #f59e0b30; }
+.btn-warn:hover{ background: #f59e0b22; }
+.btn-sm { padding: 5px 10px; font-size: 11px; }
+.btn-xs { padding: 3px 8px; font-size: 10px; }
+
+/* ISO cards */
+.iso-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(290px, 1fr)); gap: 14px; }
+.iso-card {
+  background: var(--bg2); border: 1px solid var(--border); border-radius: 12px;
+  padding: 18px; transition: all .2s; cursor: pointer; position: relative; overflow: hidden;
+}
+.iso-card::before { content:''; position:absolute; top:0;left:0;right:0;height:2px; background:linear-gradient(90deg,var(--accent),var(--accent3)); opacity:0; transition:opacity .2s; }
+.iso-card:hover  { border-color: var(--border2); transform: translateY(-1px); box-shadow: 0 6px 24px #0004; }
+.iso-card:hover::before { opacity: 1; }
+.iso-card.pinned { background: #f59e0b08; border-color: #f59e0b30; }
+.iso-card.pinned::before { opacity:1; background:linear-gradient(90deg,var(--warn),#f97316); }
+.iso-card.disabled { opacity: .45; }
+.iso-card-top { display: flex; align-items: flex-start; gap: 11px; margin-bottom: 10px; }
+.iso-icon { font-size: 26px; line-height: 1; flex-shrink: 0; }
+.iso-name { font-size: 14px; font-weight: 700; line-height: 1.3; }
+.iso-path { font-family: var(--mono); font-size: 10px; color: var(--text3); margin-top: 2px; }
+.badges { display: flex; flex-wrap: wrap; gap: 5px; margin-bottom: 10px; }
+.badge { padding: 2px 7px; border-radius: 4px; font-family: var(--mono); font-size: 9px; letter-spacing: .5px; text-transform: uppercase; }
+.badge-type    { background: #3d7eff18; color: var(--accent);   border: 1px solid #3d7eff35; }
+.badge-pinned  { background: #f59e0b18; color: var(--warn);     border: 1px solid #f59e0b35; }
+.badge-size    { background: var(--bg3); color: var(--text3);   border: 1px solid var(--border); }
+.badge-kern    { background: #10b98118; color: var(--success);  border: 1px solid #10b98135; }
+.badge-win     { background: #7c3aed18; color: #a78bfa;         border: 1px solid #7c3aed35; }
+.badge-pending { background: #f59e0b08; color: var(--warn);     border: 1px solid #f59e0b25; }
+.card-actions { display: flex; flex-wrap: wrap; gap: 5px; opacity: 0; transition: opacity .2s; margin-top: 8px; }
+.iso-card:hover .card-actions { opacity: 1; }
+
+/* Section titles */
+.sec-title { display: flex; align-items: center; gap: 10px; font-size: 11px; font-weight: 700; color: var(--text3); text-transform: uppercase; letter-spacing: 1.5px; margin-bottom: 14px; font-family: var(--mono); }
+.sec-title::after { content:''; flex:1; height:1px; background:var(--border); }
+
+/* Search */
+.search-bar { display: flex; align-items: center; gap: 10px; background: var(--bg2); border: 1px solid var(--border2); border-radius: 10px; padding: 8px 14px; margin-bottom: 20px; }
+.search-bar input { flex:1; background:none; border:none; color:var(--text); font-family:var(--sans); font-size:14px; outline:none; }
+.search-bar input::placeholder { color: var(--text3); }
+.filter-sel { background:none; border:none; color:var(--text3); font-family:var(--mono); font-size:11px; cursor:pointer; outline:none; }
+
+/* Upload */
+.upload-zone {
+  border: 2px dashed var(--border2); border-radius: 14px; padding: 50px 32px;
+  text-align: center; transition: all .2s; cursor: pointer; background: var(--bg2); margin-bottom: 24px;
+}
+.upload-zone:hover,.upload-zone.drag-over { border-color:var(--accent); background:#3d7eff06; box-shadow:inset 0 0 40px #3d7eff06; }
+.upload-icon { font-size: 44px; margin-bottom: 14px; opacity: .55; }
+.upload-title { font-size: 19px; font-weight: 700; margin-bottom: 7px; }
+.upload-sub { color: var(--text3); font-size: 12px; margin-bottom: 18px; font-family: var(--mono); }
+.upload-opts { display: flex; align-items: center; gap: 10px; justify-content: center; flex-wrap: wrap; }
+.upload-dir-sel { background:var(--bg3); border:1px solid var(--border2); color:var(--text); padding:7px 12px; border-radius:8px; font-family:var(--mono); font-size:12px; min-width:170px; }
+.upload-list { margin-top: 14px; }
+.upload-item { background:var(--bg3); border:1px solid var(--border); border-radius:8px; padding:12px 14px; margin-bottom:8px; display:flex; align-items:center; gap:10px; }
+.upload-name { flex:1; font-size:12px; font-family:var(--mono); }
+.upload-stat { font-size:11px; color:var(--text3); }
+progress { width:100%; height:3px; appearance:none; border-radius:2px; overflow:hidden; background:var(--bg); display:block; margin-top:5px; }
+progress::-webkit-progress-bar { background:var(--bg); }
+progress::-webkit-progress-value { background:linear-gradient(90deg,var(--accent),var(--accent2)); }
+
+/* Jobs panel */
+.job-list { display: flex; flex-direction: column; gap: 10px; }
+.job-card { background:var(--bg2); border:1px solid var(--border); border-radius:10px; padding:16px; }
+.job-header { display:flex; align-items:center; gap:10px; margin-bottom:8px; }
+.job-icon { font-size:18px; }
+.job-title { font-weight:700; font-size:14px; flex:1; }
+.job-status-badge { font-family:var(--mono); font-size:9px; padding:2px 8px; border-radius:4px; text-transform:uppercase; }
+.job-status-badge.running { background:#3d7eff18; color:var(--accent); border:1px solid #3d7eff30; }
+.job-status-badge.done    { background:#10b98118; color:var(--success); border:1px solid #10b98130; }
+.job-status-badge.error   { background:#ef444418; color:var(--danger); border:1px solid #ef444430; }
+.job-msg { font-size:12px; color:var(--text3); font-family:var(--mono); margin-bottom:6px; }
+.job-progress { width:100%; height:4px; appearance:none; border-radius:2px; background:var(--bg3); }
+.job-progress::-webkit-progress-bar { background:var(--bg3); }
+.job-progress::-webkit-progress-value { background:linear-gradient(90deg,var(--accent),var(--accent2)); }
+
+/* Config panel */
+.config-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(180px,1fr)); gap:14px; margin-bottom:22px; }
+.config-card { background:var(--bg2); border:1px solid var(--border); border-radius:10px; padding:16px; }
+.config-card-title { font-size:11px; color:var(--text3); margin-bottom:4px; font-family:var(--mono); }
+.config-card-value { font-family:var(--mono); font-size:17px; color:var(--accent2); }
+.code-block { background:var(--bg); border:1px solid var(--border); border-radius:8px; padding:18px; font-family:var(--mono); font-size:11px; color:var(--text2); overflow-x:auto; white-space:pre; line-height:1.6; max-height:520px; overflow-y:auto; }
+
+/* Theme panel */
+.theme-grid { display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-bottom:24px; }
+.color-row { display:flex; gap:8px; align-items:center; }
+.color-swatch { width:28px; height:28px; border-radius:6px; border:2px solid var(--border2); cursor:pointer; flex-shrink:0; }
+.ipxe-colors { display:grid; grid-template-columns:repeat(8,1fr); gap:6px; margin-bottom:8px; }
+.ipxe-color { width:100%; aspect-ratio:1; border-radius:4px; cursor:pointer; border:2px solid transparent; transition:all .15s; display:flex; align-items:center; justify-content:center; font-size:9px; font-family:var(--mono); }
+.ipxe-color.selected { border-color:white; transform:scale(1.15); }
+.theme-preview { background:var(--bg); border:1px solid var(--border); border-radius:8px; padding:16px; font-family:var(--mono); font-size:11px; line-height:1.7; }
+
+/* Tabs */
+.tabs { display:flex; gap:3px; background:var(--bg2); border:1px solid var(--border); border-radius:9px; padding:3px; margin-bottom:20px; width:fit-content; }
+.tab-btn { padding:6px 14px; border-radius:6px; border:none; background:none; color:var(--text2); font-family:var(--sans); font-size:12px; font-weight:600; cursor:pointer; transition:all .15s; }
+.tab-btn.active { background:var(--bg3); color:var(--text); border:1px solid var(--border2); }
+
+/* Modal */
+.modal-backdrop { position:fixed; inset:0; background:#000a; backdrop-filter:blur(4px); z-index:1000; display:none; align-items:center; justify-content:center; }
+.modal-backdrop.open { display:flex; }
+.modal { background:var(--bg2); border:1px solid var(--border2); border-radius:14px; padding:28px; width:540px; max-width:90vw; max-height:90vh; overflow-y:auto; box-shadow:0 24px 80px #0008; animation:mIn .18s ease; }
+@keyframes mIn { from{opacity:0;transform:scale(.96) translateY(-8px)} to{opacity:1;transform:scale(1) translateY(0)} }
+.modal-title { font-size:18px; font-weight:800; margin-bottom:20px; }
+.form-group { margin-bottom:14px; }
+.form-label { display:block; font-size:10px; color:var(--text3); margin-bottom:5px; font-family:var(--mono); text-transform:uppercase; letter-spacing:1px; }
+.form-input,.form-textarea,.form-select { width:100%; background:var(--bg3); border:1px solid var(--border2); color:var(--text); padding:9px 13px; border-radius:8px; font-family:var(--sans); font-size:13px; transition:border-color .15s; outline:none; }
+.form-input:focus,.form-textarea:focus,.form-select:focus { border-color:var(--accent); box-shadow:0 0 0 3px #3d7eff18; }
+.form-textarea { min-height:70px; resize:vertical; font-family:var(--mono); font-size:11px; }
+.form-row { display:flex; gap:10px; }
+.form-row .form-group { flex:1; }
+.toggle-row { display:flex; align-items:center; justify-content:space-between; padding:9px 13px; background:var(--bg3); border:1px solid var(--border); border-radius:8px; margin-bottom:10px; }
+.toggle-lbl { font-size:13px; }
+.toggle { position:relative; width:38px; height:21px; cursor:pointer; }
+.toggle input { opacity:0; width:0; height:0; }
+.ttrack { position:absolute; inset:0; background:var(--bg); border-radius:11px; border:1px solid var(--border2); transition:all .2s; }
+.toggle input:checked + .ttrack { background:var(--accent); border-color:var(--accent); }
+.tthumb { position:absolute; top:3px; left:3px; width:13px; height:13px; background:white; border-radius:50%; transition:transform .2s; }
+.toggle input:checked ~ .tthumb { transform:translateX(17px); }
+.modal-actions { display:flex; gap:8px; justify-content:flex-end; margin-top:20px; }
+
+/* Empty state */
+.empty { text-align:center; padding:70px 20px; color:var(--text3); }
+.empty-icon { font-size:56px; margin-bottom:14px; opacity:.25; }
+.empty-title { font-size:18px; font-weight:700; color:var(--text2); margin-bottom:7px; }
+.empty-sub { font-size:12px; font-family:var(--mono); }
+
+/* Toasts */
+.toasts { position:fixed; bottom:20px; right:20px; z-index:9999; display:flex; flex-direction:column; gap:7px; }
+.toast { background:var(--bg3); border:1px solid var(--border2); border-radius:9px; padding:11px 15px; font-size:13px; display:flex; align-items:center; gap:9px; animation:tIn .2s ease; box-shadow:0 6px 24px #0005; max-width:300px; }
+.toast.success { border-color:#10b98135; }
+.toast.error   { border-color:#ef444435; }
+@keyframes tIn  { from{transform:translateX(100%);opacity:0} to{transform:translateX(0);opacity:1} }
+@keyframes tOut { from{transform:translateX(0);opacity:1} to{transform:translateX(100%);opacity:0} }
+
+/* Scrollbar */
+::-webkit-scrollbar { width:5px; height:5px; }
+::-webkit-scrollbar-thumb { background:var(--border2); border-radius:3px; }
+</style>
+</head>
+<body>
+<div class="app">
+
+<!-- Header -->
+<header>
+  <div class="logo">
+    <div class="logo-icon">🌐</div>
+    <div>
+      <div class="logo-text">NetVentoy</div>
+      <div class="logo-sub">Network Boot Server</div>
+    </div>
+  </div>
+  <div class="header-right">
+    <div class="ip-badge" id="hdrIp">{{ server_ip }}:5000</div>
+    <div class="status-pill">
+      <div class="dot {% if dnsmasq_running %}on{% else %}off{% endif %}" id="dnsmasqDot"></div>
+      <span id="dnsmasqLbl">{% if dnsmasq_running %}PXE Active{% else %}PXE Stopped{% endif %}</span>
+    </div>
+    <button class="btn btn-secondary btn-sm" onclick="toggleDnsmasq()" id="dnsmasqBtn">
+      {% if dnsmasq_running %}Stop PXE{% else %}Start PXE{% endif %}
+    </button>
+  </div>
+</header>
+
+<main>
+<!-- Sidebar -->
+<aside>
+  <div class="sb-label">Navigation</div>
+  <ul class="sb-nav">
+    <li><button class="nav-btn active" onclick="showPanel('library')" id="nav-library"><span class="nav-icon">💿</span>ISO Library<span class="nav-count" id="cntAll">{{ isos|length }}</span></button></li>
+    <li><button class="nav-btn" onclick="showPanel('pinned')"  id="nav-pinned"><span class="nav-icon">📌</span>Pinned<span class="nav-count" id="cntPinned">{{ pinned|length }}</span></button></li>
+    <li><button class="nav-btn" onclick="showPanel('upload')"  id="nav-upload"><span class="nav-icon">⬆️</span>Upload</button></li>
+    <li><button class="nav-btn" onclick="showPanel('jobs')"    id="nav-jobs"><span class="nav-icon">⚙️</span>Jobs<span class="nav-count" id="cntJobs">0</span></button></li>
+    <li><button class="nav-btn" onclick="showPanel('theme')"   id="nav-theme"><span class="nav-icon">🎨</span>Boot Theme</button></li>
+    <li><button class="nav-btn" onclick="showPanel('config')"  id="nav-config"><span class="nav-icon">🔧</span>Config</button></li>
+    <li><button class="nav-btn" onclick="showPanel('menu')"    id="nav-menu"><span class="nav-icon">📋</span>Boot Menu</button></li>
+  </ul>
+
+  <div class="sb-label" style="margin-top:12px">Directories</div>
+  <div id="dirTree"></div>
+</aside>
+
+<!-- Content -->
+<div class="content">
+
+  <!-- Library -->
+  <div class="panel active" id="panel-library">
+    <div class="panel-header">
+      <div><div class="panel-title">ISO Library</div><div class="panel-sub" id="libSub">{{ isos|length }} images</div></div>
+      <div style="display:flex;gap:8px">
+        <button class="btn btn-secondary" onclick="rescan()">🔄 Rescan</button>
+        <button class="btn btn-secondary" onclick="showMkdir()">📁 New Folder</button>
+        <button class="btn btn-primary"   onclick="showPanel('upload')">⬆️ Upload</button>
+      </div>
+    </div>
+    <div class="search-bar">
+      <span style="color:var(--text3)">🔍</span>
+      <input type="text" placeholder="Search ISOs..." id="searchInput" oninput="filterIsos()">
+      <select id="filterType" onchange="filterIsos()" class="filter-sel">
+        <option value="">All Types</option>
+        <option value="ubuntu">Ubuntu</option>
+        <option value="debian">Debian</option>
+        <option value="redhat">RedHat</option>
+        <option value="arch">Arch</option>
+        <option value="windows">Windows</option>
+        <option value="tool">Tools</option>
+        <option value="generic">Generic</option>
+      </select>
+    </div>
+    <div id="pinnedSection" style="display:none;margin-bottom:28px">
+      <div class="sec-title">📌 Pinned</div>
+      <div class="iso-grid" id="pinnedGrid"></div>
+    </div>
+    <div id="allSection">
+      <div class="sec-title">💿 All Images</div>
+      <div class="iso-grid" id="allGrid"></div>
+    </div>
+    <div class="empty" id="libEmpty" style="display:none">
+      <div class="empty-icon">💿</div>
+      <div class="empty-title">No ISOs found</div>
+      <div class="empty-sub">Upload an ISO or drop files into the isos/ directory</div>
+    </div>
+  </div>
+
+  <!-- Pinned -->
+  <div class="panel" id="panel-pinned">
+    <div class="panel-header"><div><div class="panel-title">Pinned Images</div><div class="panel-sub">Shown at top of every boot menu</div></div></div>
+    <div class="iso-grid" id="pinnedGrid2"></div>
+    <div class="empty" id="pinnedEmpty" style="display:none"><div class="empty-icon">📌</div><div class="empty-title">No pinned ISOs</div><div class="empty-sub">Pin an ISO from the library</div></div>
+  </div>
+
+  <!-- Upload -->
+  <div class="panel" id="panel-upload">
+    <div class="panel-header"><div><div class="panel-title">Upload ISO</div><div class="panel-sub">Drag & drop or click to browse · up to 50 GB</div></div></div>
+    <div class="upload-zone" id="uploadZone" onclick="document.getElementById('fileInput').click()">
+      <div class="upload-icon">📦</div>
+      <div class="upload-title">Drop .iso files here</div>
+      <div class="upload-sub">Any Linux, Windows, or tool ISO is accepted</div>
+      <div class="upload-opts" onclick="event.stopPropagation()">
+        <select class="upload-dir-sel" id="uploadDir"><option value="">/ (root)</option></select>
+        <button class="btn btn-primary" onclick="document.getElementById('fileInput').click()">📂 Browse</button>
+      </div>
+      <input type="file" id="fileInput" accept=".iso" multiple style="display:none" onchange="handleFiles(this.files)">
+    </div>
+    <div class="upload-list" id="uploadList"></div>
+  </div>
+
+  <!-- Jobs -->
+  <div class="panel" id="panel-jobs">
+    <div class="panel-header">
+      <div><div class="panel-title">Background Jobs</div><div class="panel-sub">Kernel extraction & WinPE operations</div></div>
+      <button class="btn btn-secondary" onclick="loadJobs()">🔄 Refresh</button>
+    </div>
+    <div class="job-list" id="jobList"></div>
+    <div class="empty" id="jobsEmpty" style="display:none"><div class="empty-icon">⚙️</div><div class="empty-title">No jobs yet</div><div class="empty-sub">Extract kernel or WinPE from an ISO to see jobs here</div></div>
+  </div>
+
+  <!-- Theme -->
+  <div class="panel" id="panel-theme">
+    <div class="panel-header">
+      <div><div class="panel-title">Boot Menu Theme</div><div class="panel-sub">Customise the grub boot menu appearance</div></div>
+      <div style="display:flex;gap:8px">
+        <button class="btn btn-secondary" onclick="resetTheme()">↩ Reset</button>
+        <button class="btn btn-primary"   onclick="saveTheme()">💾 Save & Apply</button>
+      </div>
+    </div>
+
+    <div class="theme-grid">
+      <div>
+        <div class="form-group">
+          <label class="form-label">Menu Title</label>
+          <input type="text" class="form-input" id="themeTitle">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Subtitle</label>
+          <input type="text" class="form-input" id="themeSubtitle">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Boot Timeout (seconds)</label>
+          <input type="number" class="form-input" id="themeTimeout" min="5" max="300">
+        </div>
+      </div>
+      <div>
+        <div class="form-group">
+          <label class="form-label">Normal text colour</label>
+          <div id="colorNormal" class="color-row"></div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Selected item colour</label>
+          <div id="colorSelected" class="color-row"></div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Hotkey colour</label>
+          <div id="colorHotkey" class="color-row"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label class="form-label">ASCII Logo / Banner (shown at boot)</label>
+      <textarea class="form-textarea" id="themeLogo" style="min-height:110px;font-size:10px;line-height:1.4"></textarea>
+    </div>
+
+    <div class="sec-title" style="margin-top:20px">Preview</div>
+    <div class="theme-preview" id="themePreview"></div>
+  </div>
+
+  <!-- Config -->
+  <div class="panel" id="panel-config">
+    <div class="panel-header"><div><div class="panel-title">Configuration</div><div class="panel-sub">Server status & dnsmasq config</div></div></div>
+    <div class="config-grid" id="statusGrid"></div>
+    <div class="tabs">
+      <button class="tab-btn active" onclick="cfgTab('dnsmasq',this)">dnsmasq.conf</button>
+      <button class="tab-btn"        onclick="cfgTab('setup',this)">Setup Guide</button>
+    </div>
+    <div id="cfgTab-dnsmasq">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+        <div class="panel-sub">Auto-generated proxy DHCP configuration</div>
+        <button class="btn btn-secondary btn-sm" onclick="copyConf()">📋 Copy</button>
+      </div>
+      <pre class="code-block" id="dnsmasqConf">Loading...</pre>
+    </div>
+    <div id="cfgTab-setup" style="display:none">
+      <pre class="code-block" id="setupGuide"></pre>
+    </div>
+  </div>
+
+  <!-- Boot Menu -->
+  <div class="panel" id="panel-menu">
+    <div class="panel-header">
+      <div><div class="panel-title">Boot Menu Preview</div><div class="panel-sub">Live grub.cfg — regenerated automatically</div></div>
+      <button class="btn btn-secondary" onclick="loadMenuPreview()">🔄 Refresh</button>
+    </div>
+    <pre class="code-block" id="menuPreview">Loading...</pre>
+  </div>
+
+</div><!-- /content -->
+</main>
+</div><!-- /app -->
+
+<!-- Edit ISO Modal -->
+<div class="modal-backdrop" id="editModal">
+  <div class="modal">
+    <div class="modal-title">✏️ Edit ISO</div>
+    <input type="hidden" id="eKey">
+    <div class="form-row">
+      <div class="form-group" style="flex:0 0 58px">
+        <label class="form-label">Icon</label>
+        <input type="text" class="form-input" id="eIcon" maxlength="2" style="text-align:center;font-size:20px">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Display Name</label>
+        <input type="text" class="form-input" id="eName">
+      </div>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Description</label>
+      <input type="text" class="form-input" id="eDesc">
+    </div>
+    <div class="form-group">
+      <label class="form-label">Kernel Boot Arguments</label>
+      <textarea class="form-textarea" id="eKargs" placeholder="e.g. boot=casper quiet splash ---"></textarea>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Move to Directory</label>
+      <select class="form-select" id="eDir"></select>
+    </div>
+    <div class="toggle-row">
+      <span class="toggle-lbl">📌 Pin to boot menu</span>
+      <label class="toggle"><input type="checkbox" id="ePinned"><span class="ttrack"></span><span class="tthumb"></span></label>
+    </div>
+    <div class="toggle-row">
+      <span class="toggle-lbl">✅ Enabled in menu</span>
+      <label class="toggle"><input type="checkbox" id="eEnabled" checked><span class="ttrack"></span><span class="tthumb"></span></label>
+    </div>
+
+    <!-- Extraction actions shown contextually -->
+    <div id="eExtractSection" style="margin-top:16px; padding:14px; background:var(--bg3); border:1px solid var(--border); border-radius:8px; display:none">
+      <div class="panel-sub" style="margin-bottom:10px">Boot Extraction</div>
+      <div id="eExtractActions" style="display:flex;gap:8px;flex-wrap:wrap"></div>
+    </div>
+
+    <div class="modal-actions">
+      <button class="btn btn-danger btn-sm" onclick="deleteIso()">🗑️ Delete</button>
+      <button class="btn btn-secondary"     onclick="closeModal('editModal')">Cancel</button>
+      <button class="btn btn-primary"       onclick="saveIso()">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- Mkdir Modal -->
+<div class="modal-backdrop" id="mkdirModal">
+  <div class="modal" style="width:380px">
+    <div class="modal-title">📁 New Directory</div>
+    <div class="form-group">
+      <label class="form-label">Path (e.g. linux/ubuntu or tools)</label>
+      <input type="text" class="form-input" id="mkdirName" placeholder="linux/ubuntu">
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-secondary" onclick="closeModal('mkdirModal')">Cancel</button>
+      <button class="btn btn-primary"   onclick="createDir()">Create</button>
+    </div>
+  </div>
+</div>
+
+<div class="toasts" id="toasts"></div>
+
+<!-- iPXE colour palette (8 standard colours) -->
+<script>
+const IPXE_COLORS = [
+  {idx:'0', hex:'#000000', name:'Black'},
+  {idx:'1', hex:'#aa0000', name:'Red'},
+  {idx:'2', hex:'#00aa00', name:'Green'},
+  {idx:'3', hex:'#aa5500', name:'Brown'},
+  {idx:'4', hex:'#0000aa', name:'Blue'},
+  {idx:'5', hex:'#aa00aa', name:'Magenta'},
+  {idx:'6', hex:'#00aaaa', name:'Cyan'},
+  {idx:'7', hex:'#aaaaaa', name:'White'},
+];
+
+// State
+let isos = [], activeTheme = {};
+const jobPollers = {};
+
+// ── Init ────────────────────────────────────────────────────────────────────
+async function init() {
+  await loadIsos();
+  await loadStatus();
+  await loadDirTree();
+  loadMenuPreview();
+  loadDnsmasqConf();
+  loadThemeEditor();
+  loadJobs();
+  setupDragDrop();
+  populateUploadDirs();
+  setInterval(loadIsos, 6000);
+  setInterval(loadJobs, 8000);
+}
+
+// ── ISO loading & rendering ─────────────────────────────────────────────────
+async function loadIsos() {
+  const res = await fetch('/api/isos');
+  isos = await res.json();
+  renderIsos();
+  updateCounts();
+}
+
+function renderIsos(list = null) {
+  const src     = list ?? isos;
+  const pinned  = src.filter(i => i.pinned);
+
+  document.getElementById('pinnedSection').style.display = pinned.length ? '' : 'none';
+  document.getElementById('pinnedGrid').innerHTML   = pinned.map(isoCard).join('');
+  document.getElementById('allGrid').innerHTML      = src.map(isoCard).join('');
+  document.getElementById('pinnedGrid2').innerHTML  = pinned.map(isoCard).join('');
+  document.getElementById('pinnedEmpty').style.display = pinned.length ? 'none' : '';
+  document.getElementById('libEmpty').style.display    = src.length ? 'none' : '';
+  document.getElementById('libSub').textContent = `${src.length} images`;
+}
+
+function isoCard(iso) {
+  const kernBadge = iso.kernel_extracted
+    ? '<span class="badge badge-kern">✓ kernel</span>'
+    : (iso.type !== 'windows' && iso.type !== 'tool'
+        ? '<span class="badge badge-pending">⬇ extract</span>' : '');
+  const winBadge  = iso.type === 'windows'
+    ? (iso.wimboot_extracted
+        ? '<span class="badge badge-win">✓ wimboot</span>'
+        : '<span class="badge badge-pending">⬇ winpe</span>')
+    : '';
+
+  return `
+  <div class="iso-card ${iso.pinned?'pinned':''} ${iso.enabled===false?'disabled':''}"
+       onclick="editIso('${eh(iso.key)}')">
+    <div class="iso-card-top">
+      <div class="iso-icon">${iso.icon}</div>
+      <div><div class="iso-name">${eh(iso.name)}</div><div class="iso-path">/${eh(iso.path)}</div></div>
+    </div>
+    <div class="badges">
+      <span class="badge badge-type">${iso.type}</span>
+      ${iso.pinned ? '<span class="badge badge-pinned">📌</span>' : ''}
+      <span class="badge badge-size">${iso.size_human}</span>
+      ${kernBadge}${winBadge}
+    </div>
+    ${iso.description ? `<div style="font-size:12px;color:var(--text3);margin-bottom:8px">${eh(iso.description)}</div>` : ''}
+    <div class="card-actions">
+      <button class="btn btn-secondary btn-xs" onclick="event.stopPropagation();quickPin('${eh(iso.key)}')">
+        ${iso.pinned?'📌 Unpin':'📌 Pin'}
+      </button>
+      ${iso.type !== 'windows' && !iso.kernel_extracted
+        ? `<button class="btn btn-success btn-xs" onclick="event.stopPropagation();extractKernel('${eh(iso.key)}')">⬇ Extract Kernel</button>` : ''}
+      ${iso.type === 'windows' && !iso.wimboot_extracted
+        ? `<button class="btn btn-warn btn-xs" onclick="event.stopPropagation();extractWinPE('${eh(iso.key)}')">🪟 Extract WinPE</button>` : ''}
+    </div>
+  </div>`;
+}
+
+function eh(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function updateCounts() {
+  document.getElementById('cntAll').textContent    = isos.length;
+  document.getElementById('cntPinned').textContent = isos.filter(i=>i.pinned).length;
+}
+
+function filterIsos() {
+  const q = document.getElementById('searchInput').value.toLowerCase();
+  const t = document.getElementById('filterType').value;
+  renderIsos(isos.filter(i =>
+    (!q || i.name.toLowerCase().includes(q) || i.path.toLowerCase().includes(q)) &&
+    (!t || i.type === t)
+  ));
+}
+
+// ── Navigation ───────────────────────────────────────────────────────────────
+function showPanel(id) {
+  document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.nav-btn').forEach(b=>b.classList.remove('active'));
+  document.getElementById('panel-'+id).classList.add('active');
+  document.getElementById('nav-'+id)?.classList.add('active');
+  if (id==='menu')   loadMenuPreview();
+  if (id==='config') { loadDnsmasqConf(); loadStatus(); }
+  if (id==='upload') populateUploadDirs();
+  if (id==='theme')  loadThemeEditor();
+  if (id==='jobs')   loadJobs();
+}
+
+function cfgTab(name, btn) {
+  ['dnsmasq','setup'].forEach(t => {
+    document.getElementById('cfgTab-'+t).style.display = t===name ? '' : 'none';
+  });
+  document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  if (name==='setup') populateSetupGuide();
+}
+
+// ── Directory tree ───────────────────────────────────────────────────────────
+async function loadDirTree() {
+  const res  = await fetch('/api/directories');
+  const dirs = await res.json();
+  document.getElementById('dirTree').innerHTML =
+    `<div class="dir-item" onclick="filterDir('')"><span>🗂️</span> All</div>` +
+    dirs.map(d=>`<div class="dir-item" onclick="filterDir('${d}')"><span>📁</span> ${d}</div>`).join('');
+}
+
+function filterDir(dir) {
+  const filtered = dir==='' ? isos : isos.filter(i=>i.path.startsWith(dir+'/') || i.path===dir);
+  renderIsos(filtered);
+  showPanel('library');
+}
+
+// ── Status ───────────────────────────────────────────────────────────────────
+async function loadStatus() {
+  const s = await (await fetch('/api/status')).json();
+  document.getElementById('statusGrid').innerHTML = [
+    ['Server IP',         s.server_ip],
+    ['ISOs',              s.iso_count],
+    ['Kernels extracted', s.kernels_extracted],
+    ['WinPE extracted',   s.winpe_extracted],
+    ['PXE Status',        s.dnsmasq_running   ? '🟢 Running' : '🔴 Stopped'],
+    ['shim (EFI/SB)',     s.shim_present      ? '✅ staged'  : '❌ run setup.sh'],
+    ['grub EFI',          s.grub_efi_present  ? '✅ staged'  : '❌ run setup.sh'],
+    ['grub BIOS',         s.grub_bios_present ? '✅ staged'  : '❌ run setup.sh'],
+    ['Extraction tool',   s.extraction_tool],
+  ].map(([k,v])=>`
+    <div class="config-card">
+      <div class="config-card-title">${k}</div>
+      <div class="config-card-value" style="font-size:${String(v).length>10?'12px':'17px'}">${v}</div>
+    </div>`).join('');
+
+  // Update dot/label
+  document.getElementById('dnsmasqDot').className  = 'dot ' + (s.dnsmasq_running?'on':'off');
+  document.getElementById('dnsmasqLbl').textContent = s.dnsmasq_running?'PXE Active':'PXE Stopped';
+  document.getElementById('dnsmasqBtn').textContent = s.dnsmasq_running?'Stop PXE':'Start PXE';
+}
+
+async function toggleDnsmasq() {
+  const running = document.getElementById('dnsmasqDot').classList.contains('on');
+  await fetch(`/api/dnsmasq/${running?'stop':'start'}`, {method:'POST'});
+  await loadStatus();
+  toast(running ? '⏹ PXE stopped' : '✅ PXE started');
+}
+
+// ── dnsmasq config ───────────────────────────────────────────────────────────
+async function loadDnsmasqConf() {
+  document.getElementById('dnsmasqConf').textContent = await (await fetch('/api/config/dnsmasq')).text();
+}
+async function copyConf() {
+  await navigator.clipboard.writeText(document.getElementById('dnsmasqConf').textContent);
+  toast('📋 Copied');
+}
+function populateSetupGuide() {
+  const ip = document.getElementById('hdrIp').textContent.split(':')[0];
+  document.getElementById('setupGuide').textContent = `# Debian 13 — NetVentoy Setup
+# shim + grub boot chain (Secure Boot compatible)
+
+# 1. Install all APT packages (no pip)
+sudo apt install \\
+    python3-flask python3-werkzeug python3-watchdog \\
+    dnsmasq xorriso \\
+    shim-signed grub-efi-amd64-signed grub-efi-amd64-bin grub-pc-bin \\
+    wget
+
+# 2. Run setup script (must be root)
+#    Copies shimx64.efi + grubnetx64.efi from Debian packages into tftp/
+#    Runs grub-mknetdir to generate BIOS PXE core image
+#    Installs systemd service
+sudo bash setup.sh
+
+# 3. Start NetVentoy
+sudo python3 /opt/netventoy/app.py  # or wherever you extracted the tarball
+
+# 4. Web UI
+#    http://${ip}:5000
+
+# 5. USG / Router
+#    REMOVE all PXE / next-server / boot-file options from your DHCP server.
+#    dnsmasq ProxyDHCP is the sole PXE authority on your network.
+#    No boot filename needed on the router at all.
+
+# 6. Boot chain
+#    EFI Secure Boot:  shimx64.efi  (TFTP)  → grubx64.efi → grub/grub.cfg
+#    EFI HTTP Boot:    shimx64.efi  (HTTP)  → grubx64.efi → grub/grub.cfg
+#    BIOS legacy:      grub/i386-pc/core.0  (TFTP)        → grub/grub.cfg
+
+# 7. Kernel extraction (recommended for large ISOs)
+#    Open any Linux ISO in the web UI → click "Extract Kernel"
+#    NetVentoy uses xorriso to pull vmlinuz + initrd from the ISO.
+#    Extracted kernels boot directly over HTTP — fastest method,
+#    and compatible with Secure Boot if the kernel is distro-signed.
+
+# 8. Windows boot
+#    Open a Windows ISO → click "Extract WinPE"
+#    NetVentoy extracts boot.wim + BCD + boot.sdi and generates
+#    a grub entry that chainloads wimboot.
+#    Note: wimboot is not MS-signed; Secure Boot must be relaxed for Windows.`;
+}
+
+// ── Boot menu preview ────────────────────────────────────────────────────────
+async function loadMenuPreview() {
+  document.getElementById('menuPreview').textContent = await (await fetch('/api/menu/preview')).text();
+}
+
+// ── Edit modal ───────────────────────────────────────────────────────────────
+function editIso(key) {
+  const iso = isos.find(i=>i.key===key);
+  if (!iso) return;
+
+  document.getElementById('eKey').value   = key;
+  document.getElementById('eIcon').value  = iso.icon;
+  document.getElementById('eName').value  = iso.name;
+  document.getElementById('eDesc').value  = iso.description||'';
+  document.getElementById('eKargs').value = iso.kernel_args||'';
+  document.getElementById('ePinned').checked  = iso.pinned;
+  document.getElementById('eEnabled').checked = iso.enabled !== false;
+
+  // Dir select
+  const currentDir = iso.path.includes('/') ? iso.path.split('/').slice(0,-1).join('/') : '';
+  const dirs = ['', ...new Set(isos.map(i=>{
+    const p=i.path.split('/'); p.pop(); return p.join('/');
+  }).filter(Boolean))];
+  document.getElementById('eDir').innerHTML = dirs.map(d=>
+    `<option value="${d}" ${d===currentDir?'selected':''}>${d||'/ (root)'}</option>`).join('');
+
+  // Extraction section
+  const extSec = document.getElementById('eExtractSection');
+  const extAct = document.getElementById('eExtractActions');
+  extSec.style.display = '';
+  extAct.innerHTML = '';
+
+  if (iso.type === 'windows') {
+    if (iso.wimboot_extracted) {
+      extAct.innerHTML += `<span style="color:var(--success);font-size:12px">✅ WinPE extracted</span>`;
+      extAct.innerHTML += `<button class="btn btn-secondary btn-sm" onclick="clearExtraction('${key}')">🗑 Clear</button>`;
+    } else {
+      extAct.innerHTML += `<button class="btn btn-warn" onclick="extractWinPE('${key}');closeModal('editModal')">🪟 Extract WinPE for wimboot</button>`;
+    }
+  } else {
+    if (iso.kernel_extracted) {
+      extAct.innerHTML += `<span style="color:var(--success);font-size:12px">✅ Kernel + initrd extracted</span>`;
+      extAct.innerHTML += `<button class="btn btn-secondary btn-sm" onclick="clearExtraction('${key}')">🗑 Clear</button>`;
+    } else if (iso.type !== 'tool') {
+      extAct.innerHTML += `<button class="btn btn-success" onclick="extractKernel('${key}');closeModal('editModal')">⬇ Extract Kernel + initrd</button>`;
+      extAct.innerHTML += `<span style="color:var(--text3);font-size:11px">Enables reliable HTTP boot for large ISOs</span>`;
+    } else {
+      extSec.style.display = 'none';
+    }
+  }
+
+  openModal('editModal');
+}
+
+async function saveIso() {
+  const key    = document.getElementById('eKey').value;
+  const iso    = isos.find(i=>i.key===key);
+  const newDir = document.getElementById('eDir').value;
+  const curDir = iso.path.includes('/') ? iso.path.split('/').slice(0,-1).join('/') : '';
+
+  await fetch(`/api/iso/${encodeURIComponent(key)}`, {
+    method: 'PATCH', headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({
+      icon:        document.getElementById('eIcon').value,
+      name:        document.getElementById('eName').value,
+      description: document.getElementById('eDesc').value,
+      kernel_args: document.getElementById('eKargs').value,
+      pinned:      document.getElementById('ePinned').checked,
+      enabled:     document.getElementById('eEnabled').checked,
+    })
+  });
+
+  if (newDir !== curDir) {
+    await fetch(`/api/iso/${encodeURIComponent(key)}/move`, {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({directory: newDir})
+    });
+  }
+
+  closeModal('editModal');
+  await loadIsos(); await loadDirTree();
+  toast('✅ Saved');
+}
+
+async function deleteIso() {
+  const key = document.getElementById('eKey').value;
+  if (!confirm('Delete this ISO file from disk?')) return;
+  await fetch(`/api/iso/${encodeURIComponent(key)}`, {method:'DELETE'});
+  closeModal('editModal');
+  await loadIsos(); await loadDirTree();
+  toast('🗑 Deleted');
+}
+
+async function quickPin(key) {
+  const iso = isos.find(i=>i.key===key);
+  await fetch(`/api/iso/${encodeURIComponent(key)}`, {
+    method:'PATCH', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({pinned: !iso.pinned})
+  });
+  await loadIsos();
+}
+
+// ── Extraction ───────────────────────────────────────────────────────────────
+async function extractKernel(key) {
+  const res = await fetch(`/api/iso/${encodeURIComponent(key)}/extract_kernel`, {method:'POST'});
+  const d   = await res.json();
+  if (d.job_id) {
+    toast('⬇ Extracting kernel...', 'success');
+    pollJob(d.job_id);
+    showPanel('jobs');
+  } else {
+    toast('❌ ' + (d.error||'Failed'), 'error');
+  }
+}
+
+async function extractWinPE(key) {
+  const res = await fetch(`/api/iso/${encodeURIComponent(key)}/extract_winpe`, {method:'POST'});
+  const d   = await res.json();
+  if (d.job_id) {
+    toast('🪟 Extracting WinPE...', 'success');
+    pollJob(d.job_id);
+    showPanel('jobs');
+  } else {
+    toast('❌ ' + (d.error||'Failed'), 'error');
+  }
+}
+
+async function clearExtraction(key) {
+  await fetch(`/api/iso/${encodeURIComponent(key)}/clear_extraction`, {method:'POST'});
+  await loadIsos();
+  closeModal('editModal');
+  toast('🗑 Extraction cleared');
+}
+
+// ── Jobs panel ───────────────────────────────────────────────────────────────
+async function loadJobs() {
+  const jobs = await (await fetch('/api/jobs')).json();
+  document.getElementById('cntJobs').textContent = jobs.filter(j=>j.status==='running').length || jobs.length;
+  const icons = {extract_kernel:'⬇', extract_winpe:'🪟'};
+  document.getElementById('jobList').innerHTML = jobs.map(j=>`
+    <div class="job-card">
+      <div class="job-header">
+        <span class="job-icon">${icons[j.type]||'⚙️'}</span>
+        <span class="job-title">${eh(j.name)}</span>
+        <span class="job-status-badge ${j.status}">${j.status}</span>
+      </div>
+      <div class="job-msg">${eh(j.message)}</div>
+      <progress class="job-progress" value="${j.progress}" max="100"></progress>
+    </div>`).join('');
+  document.getElementById('jobsEmpty').style.display = jobs.length ? 'none' : '';
+}
+
+function pollJob(jid) {
+  if (jobPollers[jid]) return;
+  jobPollers[jid] = setInterval(async () => {
+    const j = await (await fetch(`/api/job/${jid}`)).json();
+    loadJobs();
+    if (j.status !== 'running') {
+      clearInterval(jobPollers[jid]);
+      delete jobPollers[jid];
+      if (j.status === 'done') {
+        toast('✅ ' + j.message, 'success');
+        loadIsos();
+      } else {
+        toast('❌ ' + j.message, 'error');
+      }
+    }
+  }, 1500);
+}
+
+// ── Theme editor ──────────────────────────────────────────────────────────────
+async function loadThemeEditor() {
+  const t = await (await fetch('/api/theme')).json();
+  activeTheme = t;
+  document.getElementById('themeTitle').value    = t.title;
+  document.getElementById('themeSubtitle').value = t.subtitle;
+  document.getElementById('themeTimeout').value  = t.timeout;
+  document.getElementById('themeLogo').value     = t.logo;
+
+  buildColorPicker('colorNormal',   t.fg_normal,   t.bg_normal,   'normal');
+  buildColorPicker('colorSelected', t.fg_selected, t.bg_selected, 'selected');
+  buildColorPicker('colorHotkey',   t.fg_hotkey,   t.bg_hotkey,   'hotkey');
+  updateThemePreview();
+}
+
+function buildColorPicker(containerId, fgVal, bgVal, pairName) {
+  const c = document.getElementById(containerId);
+  c.innerHTML = `
+    <span style="font-size:11px;color:var(--text3);font-family:var(--mono);width:24px">FG</span>
+    ${IPXE_COLORS.map(col=>`
+      <div class="ipxe-color ${col.idx===fgVal?'selected':''}"
+           style="background:${col.hex};color:${col.idx<4?'#fff':'#000'}"
+           title="${col.name}"
+           onclick="setPairColor('${pairName}','fg','${col.idx}',this.closest('.color-row'))">
+      </div>`).join('')}
+    <span style="font-size:11px;color:var(--text3);font-family:var(--mono);width:24px;margin-left:8px">BG</span>
+    ${IPXE_COLORS.map(col=>`
+      <div class="ipxe-color ${col.idx===bgVal?'selected':''}"
+           style="background:${col.hex};color:${col.idx<4?'#fff':'#000'}"
+           title="${col.name}"
+           onclick="setPairColor('${pairName}','bg','${col.idx}',this.closest('.color-row'))">
+      </div>`).join('')}
+  `;
+}
+
+function setPairColor(pair, fgbg, idx, container) {
+  const key = fgbg==='fg' ? `fg_${pair}` : `bg_${pair}`;
+  // Remap pair name → theme key
+  const map = {normal:'normal', selected:'selected', hotkey:'hotkey'};
+  activeTheme[`${fgbg}_${map[pair]}`] = idx;
+  // Rebuild just this picker
+  const fgKey = `fg_${map[pair]}`, bgKey = `bg_${map[pair]}`;
+  buildColorPicker(container.id, activeTheme[fgKey], activeTheme[bgKey], pair);
+  updateThemePreview();
+}
+
+function updateThemePreview() {
+  const t      = activeTheme;
+  const fg     = IPXE_COLORS.find(c=>c.idx===t.fg_normal)?.hex   || '#aaa';
+  const bg     = IPXE_COLORS.find(c=>c.idx===t.bg_normal)?.hex   || '#000';
+  const fgSel  = IPXE_COLORS.find(c=>c.idx===t.fg_selected)?.hex || '#000';
+  const bgSel  = IPXE_COLORS.find(c=>c.idx===t.bg_selected)?.hex || '#0a0';
+  const title  = document.getElementById('themeTitle')?.value    || t.title;
+  const sub    = document.getElementById('themeSubtitle')?.value || t.subtitle;
+
+  document.getElementById('themePreview').innerHTML = `
+<div style="background:${bg};color:${fg};padding:16px;border-radius:6px;font-family:var(--mono);font-size:11px;line-height:1.6">
+<div style="opacity:.7;font-size:10px;white-space:pre">${eh(document.getElementById('themeLogo')?.value||t.logo)}</div>
+<br>
+<div style="text-align:center;margin-bottom:8px">${eh(title)}  ·  ${eh(sub)}</div>
+<div style="opacity:.5">─────────────────────────────────────</div>
+<div style="background:${bgSel};color:${fgSel};padding:0 4px;display:inline-block">▶ 🟠  Ubuntu 24.04 LTS</div><br>
+<div>  🔴  Debian 12</div>
+<div>  📁  linux/</div>
+<div>  📁  tools/</div>
+<div style="opacity:.5">─────────────────────────────────────</div>
+<div>  🔧  iPXE Shell</div>
+<div>  🔄  Reboot</div>
+<div>  ⏹   Exit to BIOS/UEFI</div>
+<div style="opacity:.5;margin-top:4px">Timeout: ${document.getElementById('themeTimeout')?.value||t.timeout}s</div>
+</div>`;
+}
+
+// Live preview updates
+['themeTitle','themeSubtitle','themeTimeout','themeLogo'].forEach(id => {
+  document.addEventListener('DOMContentLoaded', () => {});
+  // Wire after DOM ready — use event delegation
+});
+
+async function saveTheme() {
+  const t = {
+    ...activeTheme,
+    title:    document.getElementById('themeTitle').value,
+    subtitle: document.getElementById('themeSubtitle').value,
+    timeout:  parseInt(document.getElementById('themeTimeout').value)||30,
+    logo:     document.getElementById('themeLogo').value,
+  };
+  await fetch('/api/theme', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(t)});
+  activeTheme = t;
+  toast('🎨 Theme saved & applied');
+  loadMenuPreview();
+}
+
+async function resetTheme() {
+  await fetch('/api/theme/reset', {method:'POST'});
+  await loadThemeEditor();
+  toast('↩ Theme reset');
+}
+
+// ── Upload ────────────────────────────────────────────────────────────────────
+function setupDragDrop() {
+  const z = document.getElementById('uploadZone');
+  z.addEventListener('dragover', e=>{e.preventDefault();z.classList.add('drag-over')});
+  z.addEventListener('dragleave', ()=>z.classList.remove('drag-over'));
+  z.addEventListener('drop', e=>{e.preventDefault();z.classList.remove('drag-over');handleFiles(e.dataTransfer.files)});
+}
+
+async function handleFiles(files) {
+  showPanel('upload');
+  for (const f of files) {
+    if (!f.name.endsWith('.iso')) { toast(`⚠ ${f.name}: not an ISO`, 'error'); continue; }
+    await uploadFile(f);
+  }
+}
+
+async function uploadFile(file) {
+  const dir  = document.getElementById('uploadDir').value;
+  const item = document.createElement('div');
+  item.className = 'upload-item';
+  item.innerHTML = `<span style="font-size:18px">📀</span>
+    <div style="flex:1">
+      <div class="upload-name">${eh(file.name)}</div>
+      <progress value="0" max="100"></progress>
+    </div>
+    <span class="upload-stat">0%</span>`;
+  document.getElementById('uploadList').prepend(item);
+  const prog = item.querySelector('progress');
+  const stat = item.querySelector('.upload-stat');
+
+  return new Promise(resolve => {
+    const xhr = new XMLHttpRequest();
+    const fd  = new FormData();
+    fd.append('file', file);
+    fd.append('directory', dir);
+    xhr.upload.onprogress = e => {
+      if (e.lengthComputable) {
+        const p = Math.round(e.loaded/e.total*100);
+        prog.value = p; stat.textContent = p+'%';
+      }
+    };
+    xhr.onload = async () => {
+      prog.value = 100;
+      if (xhr.status === 200) {
+        stat.textContent = '✅ Done'; stat.style.color='var(--success)';
+        toast(`✅ ${file.name} uploaded`);
+        await loadIsos(); await loadDirTree();
+      } else {
+        stat.textContent = '❌ Failed'; stat.style.color='var(--danger)';
+        toast(`❌ Upload failed: ${file.name}`, 'error');
+      }
+      resolve();
+    };
+    xhr.onerror = () => { stat.textContent='❌ Error'; resolve(); };
+    xhr.open('POST','/api/upload'); xhr.send(fd);
+  });
+}
+
+async function populateUploadDirs() {
+  const dirs = await (await fetch('/api/directories')).json();
+  document.getElementById('uploadDir').innerHTML =
+    `<option value="">/ (root)</option>` +
+    dirs.map(d=>`<option value="${d}">${d}</option>`).join('');
+}
+
+// ── Dirs ─────────────────────────────────────────────────────────────────────
+function showMkdir() { openModal('mkdirModal'); }
+async function createDir() {
+  const n = document.getElementById('mkdirName').value.trim();
+  if (!n) return;
+  await fetch('/api/mkdir',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({directory:n})});
+  closeModal('mkdirModal');
+  await loadDirTree();
+  toast('📁 Directory created');
+}
+
+// ── Misc ──────────────────────────────────────────────────────────────────────
+async function rescan() {
+  const d = await (await fetch('/api/rescan',{method:'POST'})).json();
+  await loadIsos(); await loadDirTree();
+  toast(`🔄 Found ${d.count} ISOs`);
+}
+
+function openModal(id)  { document.getElementById(id).classList.add('open'); }
+function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+document.addEventListener('click', e => {
+  if (e.target.classList.contains('modal-backdrop')) e.target.classList.remove('open');
+});
+
+function toast(msg, type='success') {
+  const el = document.createElement('div');
+  el.className = `toast ${type}`;
+  el.textContent = msg;
+  document.getElementById('toasts').appendChild(el);
+  setTimeout(()=>{ el.style.animation='tOut .3s ease forwards'; setTimeout(()=>el.remove(),300); }, 3000);
+}
+
+// Wire live theme preview inputs
+document.addEventListener('input', e => {
+  if (['themeTitle','themeSubtitle','themeTimeout','themeLogo'].includes(e.target.id)) {
+    updateThemePreview();
+  }
+});
+
+init();
+</script>
+</body>
+</html>

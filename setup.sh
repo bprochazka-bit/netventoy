@@ -202,9 +202,24 @@ BIOS_MODULES=(
 # Fix: use GRUB's own net stack to re-do DHCP and get the right server.
 EMBED_CFG="$GRUB_DIR/i386-pc/embed.cfg"
 cat > "$EMBED_CFG" << 'GRUBEOF'
+echo "NetVentoy: loading configuration..."
+
+# Attempt 1 — use PXE cached DHCP info (fastest, works when iPXE
+# correctly passes the ProxyDHCP server address through the PXE stack).
+set prefix=(pxe)/grub
+echo "Trying PXE prefix: $prefix"
+normal
+
+# Attempt 2 — PXE prefix failed (common in ProxyDHCP setups where
+# siaddr points to the router).  Re-do DHCP via GRUB's net stack.
+echo "PXE config load failed, trying net_bootp..."
 net_bootp
 set prefix=(tftp,$net_default_server)/grub
+echo "TFTP prefix: $prefix  server=$net_default_server"
 normal
+
+echo "ERROR: Could not load grub.cfg from any source."
+echo "Dropping to GRUB rescue shell — type 'ls' to explore devices."
 GRUBEOF
 
 if [ -d "$GRUB_BIOS_MODS" ]; then

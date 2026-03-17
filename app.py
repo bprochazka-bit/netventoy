@@ -112,15 +112,17 @@ def iso_key(path: Path) -> str:
 
 def new_job(jtype: str, name: str) -> str:
     jid = hashlib.md5(f'{jtype}{name}{time.time()}'.encode()).hexdigest()[:10]
-    job_status[jid] = {'id':jid,'type':jtype,'name':name,
-                       'status':'running','progress':0,'message':'Starting...'}
+    with _lock:
+        job_status[jid] = {'id':jid,'type':jtype,'name':name,
+                           'status':'running','progress':0,'message':'Starting...'}
     return jid
 
 def finish_job(jid: str, ok: bool, msg: str) -> None:
-    if jid in job_status:
-        job_status[jid].update({'status':'done' if ok else 'error',
-                                'progress':100 if ok else job_status[jid]['progress'],
-                                'message':msg})
+    with _lock:
+        if jid in job_status:
+            job_status[jid].update({'status':'done' if ok else 'error',
+                                    'progress':100 if ok else job_status[jid]['progress'],
+                                    'message':msg})
 
 # ── Distro detection ──────────────────────────────────────────────────────────
 _DISTRO = [
@@ -251,27 +253,29 @@ def _extract_file(iso_path: Path, iso_file: str, dest: Path) -> bool:
 
     if tool == 'xorriso':
         try:
-            r = subprocess.run(
+            subprocess.run(
                 ['xorriso', '-osirrox', 'on', '-indev', str(iso_path),
                  '-extract', iso_file, str(dest)],
                 capture_output=True, timeout=120)
             if dest.exists(): return True
-        except Exception: pass
+        except Exception as e:
+            log.debug('xorriso extraction failed for %s: %s', iso_file, e)
 
     if tool == '7z':
         try:
-            r = subprocess.run(
+            subprocess.run(
                 ['7z', 'e', str(iso_path), iso_file, f'-o{dest.parent}', '-y'],
                 capture_output=True, timeout=120)
             extracted = dest.parent / Path(iso_file).name
             if extracted.exists():
                 if extracted != dest: extracted.rename(dest)
                 return True
-        except Exception: pass
+        except Exception as e:
+            log.debug('7z extraction failed for %s: %s', iso_file, e)
 
     if tool == 'bsdtar':
         try:
-            r = subprocess.run(
+            subprocess.run(
                 ['bsdtar', '-xf', str(iso_path), '-C', str(dest.parent), iso_file],
                 capture_output=True, timeout=120)
             extracted = dest.parent / iso_file
@@ -279,7 +283,8 @@ def _extract_file(iso_path: Path, iso_file: str, dest: Path) -> bool:
                 dest.parent.mkdir(parents=True, exist_ok=True)
                 shutil.move(str(extracted), str(dest))
                 return True
-        except Exception: pass
+        except Exception as e:
+            log.debug('bsdtar extraction failed for %s: %s', iso_file, e)
 
     # Last resort: mount (needs root)
     if os.geteuid() == 0:
@@ -291,11 +296,12 @@ def _extract_file(iso_path: Path, iso_file: str, dest: Path) -> bool:
             if src.exists():
                 shutil.copy2(str(src), str(dest))
                 return dest.exists()
-        except Exception: pass
+        except Exception as e:
+            log.debug('mount extraction failed for %s: %s', iso_file, e)
         finally:
             subprocess.run(['umount', str(mnt)], capture_output=True, timeout=15)
             try: mnt.rmdir()
-            except Exception: pass
+            except OSError: pass
     return False
 
 # ── Kernel extraction ─────────────────────────────────────────────────────────
@@ -840,12 +846,14 @@ def api_clear_extraction(key):
 # ── Routes — jobs, upload, misc ───────────────────────────────────────────────
 @app.route('/api/job/<jid>')
 def api_job(jid):
-    j = job_status.get(jid)
+    with _lock: j = job_status.get(jid)
     return jsonify(j) if j else (jsonify({'error':'Unknown job'}), HTTPStatus.NOT_FOUND)
 
 @app.route('/api/jobs')
 def api_jobs():
-    return jsonify(sorted(job_status.values(), key=lambda j:j['id'], reverse=True)[:20])
+    with _lock:
+        jobs = sorted(job_status.values(), key=lambda j:j['id'], reverse=True)[:20]
+    return jsonify(jobs)
 
 @app.route('/api/upload', methods=['POST'])
 def api_upload():

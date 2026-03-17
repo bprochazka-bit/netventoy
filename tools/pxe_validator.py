@@ -24,6 +24,7 @@ import time
 import sys
 import os
 import select
+import traceback
 from datetime import datetime
 
 # ──────────────────────────────────────────────
@@ -93,6 +94,7 @@ OPT_TFTP_SERVER = 66
 OPT_BOOTFILE    = 67
 OPT_END         = 255
 
+PROXY_DHCP_PORT = 4011
 DHCP_MAGIC      = b'\x63\x82\x53\x63'
 
 MSG_NAMES = {1:'DISCOVER',2:'OFFER',3:'REQUEST',4:'DECLINE',
@@ -394,7 +396,7 @@ def do_dhcp_handshake(interface, timeout, vendor_class, debug, relax_xid=False):
 
         except Exception as e:
             log("WARN", f"  exception in receive loop: {e}")
-            import traceback; traceback.print_exc()
+            traceback.print_exc()
             continue
 
     if debug:

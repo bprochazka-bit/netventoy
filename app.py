@@ -528,11 +528,22 @@ def regenerate_grub_cfg() -> None:
     ]
 
     cfg_text = '\n'.join(L)
-    GRUB_CFG.write_text(cfg_text)
-    # Also write to TFTP root — EFI grub (grubx64.efi) looks for grub.cfg
-    # in the same directory it was loaded from, which is the TFTP root.
-    (TFTP_DIR / 'grub.cfg').write_text(cfg_text)
-    log.info('grub.cfg written (%d entries)', len(enabled))
+
+    # Write grub.cfg to every path a grub binary might search.
+    # BIOS core.0:            prefix=(pxe)/grub  →  grub/grub.cfg
+    # EFI grubnetx64 (net):   prefix=(pxe)/grub  →  grub/grub.cfg
+    # EFI grubx64 (regular):  prefix=/EFI/debian →  EFI/debian/grub.cfg
+    # EFI loaded from root:   searches cwd       →  grub.cfg  (TFTP root)
+    grub_cfg_paths = [
+        GRUB_CFG,                                   # tftp/grub/grub.cfg
+        TFTP_DIR / 'grub.cfg',                      # tftp/grub.cfg
+        TFTP_DIR / 'EFI' / 'debian' / 'grub.cfg',  # tftp/EFI/debian/grub.cfg
+    ]
+    for p in grub_cfg_paths:
+        p.parent.mkdir(parents=True, exist_ok=True)
+        p.write_text(cfg_text)
+    log.info('grub.cfg written to %d locations (%d entries)',
+             len(grub_cfg_paths), len(enabled))
 
 
 def _grub_entry(L: list, iso: dict, base_url: str, indent: str) -> None:
@@ -701,6 +712,9 @@ def write_dnsmasq_conf(iface: str = '') -> str:
         '',
         'enable-tftp',
         f'tftp-root={TFTP_DIR}',
+        '# Disable TFTP blocksize negotiation — some PXE/grub TFTP clients',
+        '# hang or timeout when the server proposes large block sizes.',
+        'tftp-no-blocksize',
         '',
     ])
 

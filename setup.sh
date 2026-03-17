@@ -75,6 +75,7 @@ info "Creating directory structure..."
 mkdir -p \
     "$TFTP_DIR" \
     "$GRUB_DIR" \
+    "$TFTP_DIR/EFI/debian" \
     "$SCRIPT_DIR/isos" \
     "$SCRIPT_DIR/kernels" \
     "$SCRIPT_DIR/wimboot" \
@@ -132,59 +133,95 @@ for p in "${GRUB_EFI_PATHS[@]}"; do
 done
 
 if [ -n "$GRUB_EFI_SRC" ]; then
-    # shim looks for grubx64.efi in the same directory it was loaded from
+    # shim looks for grubx64.efi in the same directory it was loaded from.
+    # Place it in TFTP root AND in EFI/debian/ (the Debian signed grub binary's
+    # built-in prefix is /EFI/debian, so shim may also look there).
     cp -f "$GRUB_EFI_SRC" "$TFTP_DIR/grubx64.efi"
-    ok "grubx64.efi  ← $GRUB_EFI_SRC"
+    cp -f "$GRUB_EFI_SRC" "$TFTP_DIR/EFI/debian/grubx64.efi"
+    ok "grubx64.efi  ← $GRUB_EFI_SRC  (copied to root + EFI/debian/)"
 else
     warn "grubnetx64.efi.signed not found — EFI grub stage will not work"
     warn "Try: dpkg -L grub-efi-amd64-signed | grep efi"
 fi
 
-# grub.cfg must be found by grub at (tftp)/grub/grub.cfg
-# We write a minimal stub here; the app regenerates the real one at startup.
-if [ ! -f "$GRUB_DIR/grub.cfg" ]; then
-    cat > "$GRUB_DIR/grub.cfg" << 'GRUBCFG'
-# NetVentoy grub.cfg stub — will be replaced at startup
+# grub.cfg stub — written to all paths where grub might look.
+# The app regenerates the real config at startup.
+GRUB_CFG_STUB='# NetVentoy grub.cfg stub — will be replaced at startup
 set timeout=10
 menuentry "NetVentoy loading..." {
     echo "Please wait — NetVentoy is generating the boot menu."
     sleep 3
-}
-GRUBCFG
-    ok "grub.cfg stub written"
-fi
+}'
+
+for cfg_path in "$GRUB_DIR/grub.cfg" "$TFTP_DIR/grub.cfg" "$TFTP_DIR/EFI/debian/grub.cfg"; do
+    if [ ! -f "$cfg_path" ]; then
+        echo "$GRUB_CFG_STUB" > "$cfg_path"
+    fi
+done
+ok "grub.cfg stubs written"
+
 
 # ── Stage BIOS boot chain ─────────────────────────────────────────────────────
-info "Generating BIOS PXE boot image (grub-mknetdir)..."
+info "Building BIOS PXE boot image (grub-mkimage)..."
 
-# grub-mknetdir creates <net-directory>/<subdir>/<platform>/core.0
-# We need grub/i386-pc/core.0 relative to tftp-root, so:
-#   net-directory = $TFTP_DIR   →  /opt/netventoy/tftp
-#   subdir        = grub        →  /opt/netventoy/tftp/grub/i386-pc/core.0
-grub-mknetdir \
-    --net-directory="$TFTP_DIR" \
-    --subdir="grub" \
-    2>&1 | tail -5
+# Build core.0 with ALL needed modules embedded so grub does NOT need to
+# fetch normal.mod (or anything else) over TFTP after loading core.0.
+# grub-mknetdir embeds only a minimal set and relies on TFTP module loading
+# which is fragile (timeouts, blocksize issues).  grub-mkimage lets us
+# embed everything the menu needs in one binary.
 
-if [ -f "$TFTP_DIR/grub/i386-pc/core.0" ]; then
-    ok "BIOS grub core.0 generated at grub/i386-pc/core.0"
+GRUB_BIOS_MODS="/usr/lib/grub/i386-pc"
+BIOS_CORE="$GRUB_DIR/i386-pc/core.0"
+mkdir -p "$GRUB_DIR/i386-pc"
+
+# Modules to embed — covers menu, Linux boot, ISO loopback, HTTP, display:
+BIOS_MODULES=(
+    # PXE / network
+    pxe tftp
+    # Core boot
+    normal configfile
+    # Linux boot
+    linux linux16
+    # ISO / loopback
+    loopback iso9660
+    # Filesystem
+    fat ext2 part_gpt part_msdos
+    # Display / menu
+    gfxterm gfxterm_background font
+    # Scripting / utilities
+    echo test sleep search regexp cat read ls
+    # Chain / control
+    chain reboot halt
+    # Misc often needed
+    minicmd biosdisk
+)
+
+if [ -d "$GRUB_BIOS_MODS" ]; then
+    grub-mkimage \
+        -O i386-pc-pxe \
+        -o "$BIOS_CORE" \
+        -p '(pxe)/grub' \
+        -d "$GRUB_BIOS_MODS" \
+        "${BIOS_MODULES[@]}" \
+        2>&1
+
+    if [ -f "$BIOS_CORE" ]; then
+        ok "BIOS grub core.0 built with embedded modules ($(du -sh "$BIOS_CORE" | cut -f1))"
+    else
+        warn "grub-mkimage failed — falling back to grub-mknetdir"
+        grub-mknetdir \
+            --net-directory="$TFTP_DIR" \
+            --subdir="grub" \
+            2>&1 | tail -5
+    fi
 else
-    warn "grub-mknetdir may have failed — check output above"
+    warn "grub i386-pc modules not found at $GRUB_BIOS_MODS — BIOS PXE boot unavailable"
 fi
 
-# grub-mknetdir also generates an EFI image but we prefer the signed one.
-# Remove the unsigned EFI output to avoid confusion.
-rm -f "$GRUB_DIR/x86_64-efi/core.efi" 2>/dev/null || true
-
-# ── Ensure grub modules are available for network loading ─────────────────
-# BIOS grub core.0 has a minimal set of embedded modules. It loads additional
-# modules (normal.mod, etc.) from the network using the prefix (pxe)/grub.
-# grub-mknetdir may not copy all .mod files, so ensure they're present.
-GRUB_BIOS_MODS="/usr/lib/grub/i386-pc"
+# Still copy .mod files so grub can load any optional modules not embedded.
 if [ -d "$GRUB_BIOS_MODS" ]; then
-    mkdir -p "$GRUB_DIR/i386-pc"
     cp -n "$GRUB_BIOS_MODS/"*.mod "$GRUB_DIR/i386-pc/" 2>/dev/null || true
-    ok "grub BIOS i386-pc modules staged"
+    ok "grub BIOS i386-pc modules staged (fallback)"
 fi
 
 # EFI grub: grubnetx64.efi.signed has most modules built-in for netboot but

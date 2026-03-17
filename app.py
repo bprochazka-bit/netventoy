@@ -452,10 +452,10 @@ def regenerate_grub_cfg() -> None:
         '# Do not edit by hand — regenerated automatically',
         '',
         '# ── Grub prefix: tell grub where to find modules ─────────────────',
-        '# BIOS core.0 embed.cfg sets prefix=(pxe)/grub which uses the PXE',
-        '# firmware network stack (no DHCP needed).  EFI grub sets its own',
-        '# prefix.  Only override if prefix was not set.',
-        'if [ -z "$prefix" ]; then set prefix=(pxe)/grub; fi',
+        '# BIOS core.0 embed.cfg sets prefix=(tftp,$net_default_server)/grub',
+        '# using GRUB\'s own TFTP client.  EFI grub sets its own prefix.',
+        '# Only override if prefix was not set.',
+        'if [ -z "$prefix" ]; then set prefix=(tftp)/grub; fi',
         '',
         '# ── Platform & Secure Boot detection ─────────────────────────────',
         'set is_efi=false',
@@ -541,8 +541,8 @@ def regenerate_grub_cfg() -> None:
     cfg_text = '\n'.join(L)
 
     # Write grub.cfg to every path a grub binary might search.
-    # BIOS core.0:            prefix=(pxe)/grub  →  grub/grub.cfg
-    # EFI grubnetx64 (net):   prefix=(pxe)/grub  →  grub/grub.cfg
+    # BIOS core.0:            prefix=(tftp)/grub  →  grub/grub.cfg
+    # EFI grubnetx64 (net):   prefix=(tftp)/grub  →  grub/grub.cfg
     # EFI grubx64 (regular):  prefix=/EFI/debian →  EFI/debian/grub.cfg
     # EFI loaded from root:   searches cwd       →  grub.cfg  (TFTP root)
     grub_cfg_paths = [

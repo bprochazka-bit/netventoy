@@ -211,10 +211,17 @@ fi
 info "Server IP: $SERVER_IP"
 
 # Embedded bootstrap config — runs in rescue mode (no comments, no if/then).
+# ProxyDHCP bug (Debian #759686): GRUB reads the *main* DHCP server's cached
+# ACK, not the proxy's, so net_default_server points to the wrong host.
+# Fix: hardcode net_default_server to our TFTP server IP.
+# Note: the pxe module auto-reads the PXE firmware's cached DHCP ACK on init,
+# so GRUB already has a source IP — no net_bootp needed for BIOS PXE.
 EMBED_CFG="$GRUB_DIR/i386-pc/embed.cfg"
 cat > "$EMBED_CFG" << GRUBEOF
 echo "NetVentoy: loading configuration..."
-set prefix=(pxe)/grub
+set net_default_server=${SERVER_IP}
+set root=(tftp,\$net_default_server)
+set prefix=(\$root)/grub
 normal
 
 echo "ERROR: Could not load grub.cfg — dropping to rescue shell."
@@ -225,7 +232,7 @@ if [ -d "$GRUB_BIOS_MODS" ]; then
         -O i386-pc-pxe \
         -o "$BIOS_CORE" \
         -c "$EMBED_CFG" \
-        -p "(pxe)/grub" \
+        -p "(tftp)/grub" \
         -d "$GRUB_BIOS_MODS" \
         "${BIOS_MODULES[@]}" \
         2>&1

@@ -216,9 +216,10 @@ info "Server IP: $SERVER_IP"
 # Embedded bootstrap config — runs in rescue mode (no comments, no if/then).
 EMBED_CFG="$GRUB_DIR/i386-pc/embed.cfg"
 cat > "$EMBED_CFG" << GRUBEOF
-echo "NetVentoy: loading configuration..."
+echo "NetVentoy: acquiring network via DHCP..."
+net_bootp
+echo "NetVentoy: loading configuration from ${SERVER_IP}..."
 set prefix=(tftp,${SERVER_IP})/grub
-echo "TFTP prefix: \$prefix"
 normal
 
 echo "ERROR: Could not load grub.cfg — dropping to rescue shell."

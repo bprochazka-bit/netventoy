@@ -1032,10 +1032,43 @@ def serve_wimboot(filename): return send_from_directory(WIMBOOT_DIR, filename, c
 # ── Startup / shutdown ────────────────────────────────────────────────────────
 _watcher: Observer | None = None
 
+def _check_bridge_netfilter() -> None:
+    """Warn (and fix if possible) br_netfilter blocking DHCP on bridges.
+
+    Proxmox and other hypervisors load br_netfilter, which routes all
+    bridged frames through iptables.  This silently drops DHCP broadcasts
+    before they reach the VM — ProxyDHCP never sees DHCPDISCOVER packets.
+    """
+    sysctl = Path('/proc/sys/net/bridge/bridge-nf-call-iptables')
+    if not sysctl.exists():
+        return  # br_netfilter not loaded — no problem
+    try:
+        val = sysctl.read_text().strip()
+    except OSError:
+        return
+    if val != '1':
+        return  # already disabled — fine
+
+    log.warning('br_netfilter is active — bridged DHCP broadcasts will be '
+                'filtered through iptables, which breaks ProxyDHCP')
+    # Try to disable it (requires root, which we already need for port 67)
+    try:
+        sysctl.write_text('0\n')
+        Path('/proc/sys/net/bridge/bridge-nf-call-ip6tables').write_text('0\n')
+        log.info('Disabled bridge-nf-call-iptables (DHCP broadcasts will '
+                 'now reach this VM)')
+    except OSError:
+        log.warning('Cannot disable bridge-nf-call-iptables — run on the '
+                    'hypervisor host:\n'
+                    '  echo 0 > /proc/sys/net/bridge/bridge-nf-call-iptables\n'
+                    '  echo 0 > /proc/sys/net/bridge/bridge-nf-call-ip6tables')
+
+
 def startup():
     global _watcher
     load_config(); scan_all_isos()
     _watcher = start_watcher()
+    _check_bridge_netfilter()
     start_dnsmasq()
 
 def shutdown(sig, frame):

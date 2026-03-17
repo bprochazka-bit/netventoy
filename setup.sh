@@ -186,6 +186,30 @@ if [ -d "$GRUB_EFI_MODS" ]; then
     ok "grub EFI modules staged"
 fi
 
+# ── Proxmox / bridge netfilter check ─────────────────────────────────────────
+# When running inside a Proxmox VM (or any host with br_netfilter loaded),
+# bridged DHCP broadcasts are routed through iptables and often silently
+# dropped before reaching the VM.  This makes ProxyDHCP completely invisible
+# to PXE clients.  The fix is to disable bridge-nf-call-iptables on the
+# HYPERVISOR HOST (not inside the VM).
+BRNF="/proc/sys/net/bridge/bridge-nf-call-iptables"
+if [ -f "$BRNF" ] && [ "$(cat "$BRNF")" = "1" ]; then
+    warn "br_netfilter is active — DHCP broadcasts through bridges will be filtered"
+    warn "If running inside a VM, run this on the Proxmox/hypervisor HOST:"
+    echo ""
+    echo "    # Immediate fix:"
+    echo "    echo 0 > /proc/sys/net/bridge/bridge-nf-call-iptables"
+    echo "    echo 0 > /proc/sys/net/bridge/bridge-nf-call-ip6tables"
+    echo ""
+    echo "    # Persistent across reboots (on the Proxmox host):"
+    echo "    cat > /etc/sysctl.d/99-netventoy-bridge.conf << 'SYSCTL'"
+    echo "    net.bridge.bridge-nf-call-iptables = 0"
+    echo "    net.bridge.bridge-nf-call-ip6tables = 0"
+    echo "    SYSCTL"
+    echo "    sysctl --system"
+    echo ""
+fi
+
 # ── Systemd service ───────────────────────────────────────────────────────────
 if [ -f "$SCRIPT_DIR/netventoy.service" ]; then
     sed "s|/opt/netventoy|$SCRIPT_DIR|g" \

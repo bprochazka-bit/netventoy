@@ -92,6 +92,7 @@ OPT_VENDOR_CLASS= 60
 OPT_CLIENT_ID   = 61
 OPT_TFTP_SERVER = 66
 OPT_BOOTFILE    = 67
+OPT_CLIENT_ARCH = 93
 OPT_END         = 255
 
 PROXY_DHCP_PORT = 4011
@@ -200,6 +201,12 @@ def build_discover(xid, mac, vendor_class):
     opts += bytes([OPT_VENDOR_CLASS, len(vc)]) + vc
     cid   = bytes([0x01]) + mac
     opts += bytes([OPT_CLIENT_ID, len(cid)]) + cid
+    # Option 93 — Client System Architecture (RFC 4578)
+    # Real PXE firmware always sends this; dnsmasq uses it for dhcp-match
+    import re
+    arch_m = re.search(r'Arch:(\d+)', vendor_class)
+    arch_code = int(arch_m.group(1)) if arch_m else 0
+    opts += bytes([OPT_CLIENT_ARCH, 2]) + struct.pack('!H', arch_code)
     opts += bytes([OPT_END])
     return pkt + opts
 

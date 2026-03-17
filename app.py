@@ -15,7 +15,7 @@ apt dependencies:
 No pip required.
 """
 
-import os, json, subprocess, threading, hashlib, shutil, signal
+import os, json, subprocess, threading, hashlib, shutil, signal, time
 import sys, time, re, socket, logging, tempfile
 from pathlib import Path
 from http import HTTPStatus
@@ -705,21 +705,55 @@ def write_dnsmasq_conf(iface: str = '') -> str:
     DNSMASQ_CONF.write_text(conf)
     return conf
 
+def _kill_stale_dnsmasq() -> None:
+    """Kill any dnsmasq processes left over from previous runs."""
+    try:
+        out = subprocess.check_output(['pgrep', '-a', 'dnsmasq'], text=True).strip()
+    except (subprocess.CalledProcessError, FileNotFoundError):
+        return  # no dnsmasq running
+    for line in out.splitlines():
+        pid_str = line.split()[0]
+        try:
+            pid = int(pid_str)
+            os.kill(pid, signal.SIGTERM)
+            log.info('killed stale dnsmasq PID %d', pid)
+        except (ValueError, ProcessLookupError, PermissionError):
+            pass
+    # give them a moment to exit
+    time.sleep(0.5)
+
+
 def start_dnsmasq(iface: str = '') -> bool:
     global dnsmasq_proc
     if dnsmasq_proc and dnsmasq_proc.poll() is None: return True
     if not shutil.which('dnsmasq'):
         log.warning('dnsmasq not found — apt install dnsmasq'); return False
+    # Kill any orphaned dnsmasq processes before starting fresh
+    _kill_stale_dnsmasq()
     write_dnsmasq_conf(iface)
     try:
         dnsmasq_proc = subprocess.Popen(
             ['dnsmasq','--no-daemon',f'--conf-file={DNSMASQ_CONF}','--log-facility=-'],
-            stdout=subprocess.DEVNULL, stderr=subprocess.STDOUT)
-        log.info('dnsmasq started (PID %d)', dnsmasq_proc.pid); return True
+            stderr=subprocess.PIPE, stdout=subprocess.DEVNULL)
+        log.info('dnsmasq started (PID %d)', dnsmasq_proc.pid)
+        # Start a background thread to relay dnsmasq log output
+        threading.Thread(target=_relay_dnsmasq_logs, daemon=True).start()
+        return True
     except PermissionError:
         log.error('dnsmasq: permission denied — run as root'); return False
     except Exception as e:
         log.error('dnsmasq failed: %s', e); return False
+
+
+def _relay_dnsmasq_logs() -> None:
+    """Read dnsmasq stderr (--log-facility=-) and forward to our logger."""
+    if not dnsmasq_proc or not dnsmasq_proc.stderr:
+        return
+    for line in dnsmasq_proc.stderr:
+        text = line.decode('utf-8', errors='replace').rstrip()
+        if text:
+            log.info('[dnsmasq] %s', text)
+
 
 def stop_dnsmasq() -> None:
     global dnsmasq_proc
@@ -729,6 +763,8 @@ def stop_dnsmasq() -> None:
         except subprocess.TimeoutExpired: dnsmasq_proc.kill()
         dnsmasq_proc = None
         log.info('dnsmasq stopped')
+    # Also clean up any orphaned instances
+    _kill_stale_dnsmasq()
 
 def dnsmasq_running() -> bool:
     return dnsmasq_proc is not None and dnsmasq_proc.poll() is None

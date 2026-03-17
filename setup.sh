@@ -177,7 +177,7 @@ mkdir -p "$GRUB_DIR/i386-pc"
 # Modules to embed — covers menu, Linux boot, ISO loopback, HTTP, display:
 BIOS_MODULES=(
     # PXE / network
-    pxe tftp
+    pxe tftp net
     # Core boot
     normal configfile
     # Linux boot
@@ -196,10 +196,22 @@ BIOS_MODULES=(
     minicmd biosdisk
 )
 
+# Embedded bootstrap config — runs in rescue mode before normal.
+# In ProxyDHCP mode the PXE cached DHCP packet often lacks the correct
+# siaddr (TFTP server), so GRUB's (pxe) device points to the wrong host.
+# Fix: use GRUB's own net stack to re-do DHCP and get the right server.
+EMBED_CFG="$GRUB_DIR/i386-pc/embed.cfg"
+cat > "$EMBED_CFG" << 'GRUBEOF'
+net_bootp
+set prefix=(tftp,$net_default_server)/grub
+normal
+GRUBEOF
+
 if [ -d "$GRUB_BIOS_MODS" ]; then
     grub-mkimage \
         -O i386-pc-pxe \
         -o "$BIOS_CORE" \
+        -c "$EMBED_CFG" \
         -p '(pxe)/grub' \
         -d "$GRUB_BIOS_MODS" \
         "${BIOS_MODULES[@]}" \

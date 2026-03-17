@@ -161,7 +161,12 @@ _DISTRO = [
 _KERNEL_PATHS = {
     'ubuntu':   [('casper/vmlinuz','casper/initrd'),
                  ('casper/vmlinuz','casper/initrd.lz')],
-    'debian':   [('live/vmlinuz','live/initrd.img'),
+    'debian':   [('install.amd/vmlinuz','install.amd/initrd.gz'),
+                 ('install.amd/vmlinuz','install.amd/gtk/initrd.gz'),
+                 ('install.386/vmlinuz','install.386/initrd.gz'),
+                 ('install.arm64/vmlinuz','install.arm64/initrd.gz'),
+                 ('d-i/vmlinuz','d-i/initrd.gz'),
+                 ('live/vmlinuz','live/initrd.img'),
                  ('live/vmlinuz1','live/initrd1.img')],
     'redhat':   [('isolinux/vmlinuz','isolinux/initrd.img'),
                  ('images/pxeboot/vmlinuz','images/pxeboot/initrd.img')],
@@ -253,11 +258,14 @@ def _extract_file(iso_path: Path, iso_file: str, dest: Path) -> bool:
 
     if tool == 'xorriso':
         try:
-            subprocess.run(
+            xorriso_path = iso_file if iso_file.startswith('/') else '/' + iso_file
+            r = subprocess.run(
                 ['xorriso', '-osirrox', 'on', '-indev', str(iso_path),
-                 '-extract', iso_file, str(dest)],
-                capture_output=True, timeout=120)
+                 '-extract', xorriso_path, str(dest)],
+                capture_output=True, text=True, timeout=120)
             if dest.exists(): return True
+            log.debug('xorriso: file not found %s (rc=%d, stderr=%s)',
+                       iso_file, r.returncode, r.stderr.strip()[:200])
         except Exception as e:
             log.debug('xorriso extraction failed for %s: %s', iso_file, e)
 
@@ -326,7 +334,8 @@ def extract_kernel(key: str, jid: str) -> None:
             job_status[jid].update({'progress': 60, 'message': f'Kernel found, extracting initrd...'})
             # Try the paired initrd, then alternates
             for ia in [isrc, 'casper/initrd.lz', 'live/initrd1.img',
-                       'isolinux/initrd', 'boot/initramfs.img', 'boot/initramfs']:
+                       'isolinux/initrd', 'boot/initramfs.img', 'boot/initramfs',
+                       'install.amd/initrd.gz', 'install.386/initrd.gz']:
                 if _extract_file(iso_path, ia, initrd):
                     success = True; break
         if success: break
